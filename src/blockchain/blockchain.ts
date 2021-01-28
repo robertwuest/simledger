@@ -1,5 +1,4 @@
 import SmlCommon from '@/common';
-import { SHA256 } from 'crypto-js';
 import { Block } from './block';
 import { Transaction } from './transaction';
 /**
@@ -11,24 +10,33 @@ export class Blockchain {
   difficulty: number;
   pendingTransactions: Transaction[];
   miningReward: number;
+  initialAddress: string;
 
-  constructor() {
-    this.chain = [this.createGenesisBlock()];
+  constructor(initialAddress: string) {
     // assume a value for difficulty
     this.difficulty = 4;
     // Place to store transactions in between block creation
     this.pendingTransactions = [];
     // How many coins a miner will get as a reward for his/her efforts
     this.miningReward = 10.0;
+    // genesis address
+    this.initialAddress = initialAddress;
+    // setup the chain with a genesis block
+    this.chain = [this.createGenesisBlock()];
+    // reward initial genesis account
+    this.addTransaction(new Transaction("_", initialAddress, this.miningReward));
   }
   /**
    * Creates the genesis block
    */
   createGenesisBlock() {
     return new Block(
+      0,
       SmlCommon.generateTimestamp(),
       [],
-      SHA256(Math.random().toString()).toString()
+      this.initialAddress,
+      "genesisRewardAddress",
+      "genesisHash"
     );
   }
 
@@ -36,20 +44,24 @@ export class Blockchain {
    * Create new block with all pending transactions and mine it
    */
   minePendingTransactions(miningRewardAddress: string) {
-    let block = new Block(SmlCommon.generateTimestamp(), this.pendingTransactions);
+    let block = new Block(this.chain.length, SmlCommon.generateTimestamp(), this.pendingTransactions, miningRewardAddress, this.getLatestBlock().rewardAddress, this.getLatestBlock().hash);
     block.mineBlock(this.difficulty);
 
     // Add the newly mined block to the chain
     this.chain.push(block);
 
+    const rewardTx = new Transaction('_', miningRewardAddress, this.miningReward);
+
     // Reset the pending transactions and send the mining reward
     this.pendingTransactions = [
-      new Transaction(null, miningRewardAddress, this.miningReward)
+      rewardTx
     ];
   }
 
   /**
    * Get the balance of an address
+   * WARNING! The bigger the chain becomes this function gets more expensive since we are using an account based ledger.
+   * Bitcoin for example uses a transaction based ledger where the balance of an account is represented as a transaction
    */
   getBalanceOfAddress(address: string) {
     let balance = 0.0; // you start at zero!
@@ -73,6 +85,17 @@ export class Blockchain {
   }
 
   /**
+   * Get block in chain
+   * @param chainLength
+   */
+  getBlock(chainLength: number) {
+    if (chainLength < this.getBlockchainLength()) {
+      return this.chain[chainLength];
+    }
+    return null;
+  }
+
+  /**
    * Get last added block
    */
   getLatestBlock() {
@@ -86,23 +109,47 @@ export class Blockchain {
     return this.chain.length;
   }
 
-  /** 
+  /**
    * Add new block to chain
    */
   addBlock(block: Block) {
-    block.previousHash = this.getLatestBlock().hash;
-    block.hash = block.generateHash();
+    if (block.hash === this.getLatestBlock().hash) {
+      console.log('BC: Block already known');
+      return false;
+    }
+    if (block.length !== this.getBlockchainLength() + 1) {
+      console.log('BC: Block denotes invalid chain length');
+      return false;
+    }
+    if (block.hash !== block.generateHash()) {
+      console.log('BC: Block hash invalid');
+      return false;
+    }
+    if (block.previousHash !== this.getLatestBlock().hash) {
+      console.log('BC: Block has invalid previous hash');
+      return false;
+    }
+    if (block.hasValidTransactions(this)) {
+      console.log('BC: Block has invalid transactions');
+      return false;
+    }
+    if (block.hash.substring(0, this.difficulty).split('').every(val => val === '0')) {
+      console.log('BC: Block hash doesnt meet difficulty');
+      return false;
+    }
     this.chain.push(block);
+    return true;
   }
 
   /**
    * Validate integrity of the blockchain
+   * WARNING! The bigger the chain becomes this function gets more expensive
    */
   isChainValid() {
     for (let i = 1; i < this.chain.length; i++) {
       const currentBlock = this.chain[i];
       const previousBlock = this.chain[i - 1];
-      // Recalculate the hash of the block and see if it matches up.    
+      // Recalculate the hash of the block and see if it matches up.
       // This allows us to detect changes to a single block
       if (currentBlock.hash !== currentBlock.generateHash()) {
         return false;
@@ -113,7 +160,7 @@ export class Blockchain {
         return false;
       }
 
-      if (!currentBlock.hasValidTransactions()) {
+      if (!currentBlock.hasValidTransactions(this)) {
         return false;
       }
     }
@@ -130,13 +177,33 @@ export class Blockchain {
    */
   addTransaction(transaction: Transaction) {
     if (!transaction.fromAddress || !transaction.toAddress) {
-      throw new Error('Transaction must include from and to address');
+      console.warn('TX: Transaction must include from and to address');
+      return false;
     }
 
     if (!transaction.isValid()) {
-      throw new Error('Cannot add invalid transaction to chain');
+      console.warn('TX: Cannot add invalid transaction to chain');
+      return false;
+    }
+
+    if (transaction.fromAddress !== '_' && this.getBalanceOfAddress(transaction.fromAddress) - transaction.amount < 0.0) {
+      console.warn('TX: Transaction overspend from sender');
+      return false;
+    }
+
+    if (transaction.fromAddress === '_') {
+      if (transaction.amount !== this.miningReward) {
+        console.warn('TX: Invalid reward');
+        return false;
+      }
+      if (this.pendingTransactions.find(tx => tx.fromAddress)) {
+        console.log(transaction);
+        console.warn('TX: Duplicated reward transaction');
+        return false;
+      }
     }
 
     this.pendingTransactions.push(transaction);
+    return true;
   }
 }

@@ -6,11 +6,12 @@ import { SHA256 } from "crypto-js";
  * This code is based on the original implementations by Xavier Decuyper https://www.codementor.io/@savjee
  */
 export class Transaction {
-  fromAddress: string | null;
+  fromAddress: string;
   toAddress: string;
   amount: number;
   signature: any;
-  constructor(fromAddress: string | null, toAddress: string, amount: number) {
+
+  constructor(fromAddress: string, toAddress: string, amount: number) {
     this.fromAddress = fromAddress;
     this.toAddress = toAddress;
     this.amount = amount;
@@ -20,14 +21,14 @@ export class Transaction {
    * Generate hash for transaction
    */
   generateHash() {
-    return SHA256(this.fromAddress + this.toAddress + this.amount).toString();
+    return SmlCommon.HexToBase58(SHA256(this.fromAddress + this.toAddress + this.amount).toString());
   }
 
-  /** 
+  /**
    * Sign the transaction
    */
   signTransaction(signingKey: any) {
-    if (signingKey.getPublic('hex') !== this.fromAddress) {
+    if (SmlCommon.HexToBase58(signingKey.getPublic(true,'hex')) !== this.fromAddress) {
       throw new Error('You cannot sign transactions for other wallets!');
     }
 
@@ -40,13 +41,14 @@ export class Transaction {
    * Validate transaction
    */
   isValid() {
-    if (this.fromAddress === null) return true;
+    if (this.fromAddress === '_') return true;
 
     if (!this.signature || this.signature.length === 0) {
-      throw new Error('No signature in this transaction');
+      console.warn('TX: No signature in this transaction');
+      return false;
     }
 
-    const publicKey = SmlCommon.curve.keyFromPublic(this.fromAddress, 'hex');
+    const publicKey = SmlCommon.curve.keyFromPublic(SmlCommon.Base58ToHex(this.fromAddress), 'hex');
     return publicKey.verify(this.generateHash(), this.signature);
   }
 }
