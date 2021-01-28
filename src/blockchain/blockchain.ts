@@ -1,6 +1,7 @@
-import SmlCommon from '@/common';
-import { Block } from './block';
+import SmlCommon from '../common';
 import { Transaction } from './transaction';
+import { Block } from './block'; // eslint-disable-line
+
 /**
  * Instance class for a blockchain
  * This code is based on the original implementations by Xavier Decuyper https://www.codementor.io/@savjee
@@ -14,7 +15,7 @@ export class Blockchain {
 
   constructor(initialAddress: string) {
     // assume a value for difficulty
-    this.difficulty = 4;
+    this.difficulty = 5;
     // Place to store transactions in between block creation
     this.pendingTransactions = [];
     // How many coins a miner will get as a reward for his/her efforts
@@ -24,8 +25,9 @@ export class Blockchain {
     // setup the chain with a genesis block
     this.chain = [this.createGenesisBlock()];
     // reward initial genesis account
-    this.addTransaction(new Transaction("_", initialAddress, this.miningReward));
+    this.addTransaction(new Transaction('_', initialAddress, this.miningReward));
   }
+
   /**
    * Creates the genesis block
    */
@@ -35,27 +37,30 @@ export class Blockchain {
       SmlCommon.generateTimestamp(),
       [],
       this.initialAddress,
-      "genesisRewardAddress",
-      "genesisHash"
+      'genesisRewardAddress',
+      'genesisHash',
     );
   }
 
   /**
    * Create new block with all pending transactions and mine it
    */
-  minePendingTransactions(miningRewardAddress: string) {
-    let block = new Block(this.chain.length, SmlCommon.generateTimestamp(), this.pendingTransactions, miningRewardAddress, this.getLatestBlock().rewardAddress, this.getLatestBlock().hash);
-    block.mineBlock(this.difficulty);
-
-    // Add the newly mined block to the chain
-    this.chain.push(block);
-
-    const rewardTx = new Transaction('_', miningRewardAddress, this.miningReward);
-
-    // Reset the pending transactions and send the mining reward
-    this.pendingTransactions = [
-      rewardTx
-    ];
+  minePendingTransactions(miningRewardAddress: string, callback?: (newBlock: any) => void) {
+    const block = new Block(this.chain.length + 1, SmlCommon.generateTimestamp(), this.pendingTransactions, miningRewardAddress, this.getLatestBlock().rewardAddress, this.getLatestBlock().hash);
+    const callB = (newBlock: any) => {
+      // Add the newly mined block to the chain
+      if (this.addBlock(newBlock)) {
+        const rewardTx = new Transaction('_', miningRewardAddress, this.miningReward);
+        // Reset the pending transactions and send the mining reward
+        this.pendingTransactions = [
+          rewardTx,
+        ];
+        if (callback) {
+          callback(newBlock);
+        }
+      }
+    };
+    Block.mineBlock(block, this.difficulty, callB);
   }
 
   /**
@@ -69,7 +74,6 @@ export class Blockchain {
     // Loop over each block and each transaction inside the block
     for (const block of this.chain) {
       for (const trans of block.transactions) {
-
         // If the given address is the sender -> reduce the balance
         if (trans.fromAddress === address) {
           balance -= trans.amount;
@@ -121,7 +125,7 @@ export class Blockchain {
       console.log('BC: Block denotes invalid chain length');
       return false;
     }
-    if (block.hash !== block.generateHash()) {
+    if (block.hash !== Block.generateHash(block)) {
       console.log('BC: Block hash invalid');
       return false;
     }
@@ -129,11 +133,11 @@ export class Blockchain {
       console.log('BC: Block has invalid previous hash');
       return false;
     }
-    if (block.hasValidTransactions(this)) {
+    if (!Block.hasValidTransactions(block, this)) {
       console.log('BC: Block has invalid transactions');
       return false;
     }
-    if (block.hash.substring(0, this.difficulty).split('').every(val => val === '0')) {
+    if (!block.hash.substring(0, this.difficulty).split('').every(val => val === '0')) {
       console.log('BC: Block hash doesnt meet difficulty');
       return false;
     }
@@ -151,7 +155,7 @@ export class Blockchain {
       const previousBlock = this.chain[i - 1];
       // Recalculate the hash of the block and see if it matches up.
       // This allows us to detect changes to a single block
-      if (currentBlock.hash !== currentBlock.generateHash()) {
+      if (currentBlock.hash !== Block.generateHash(currentBlock)) {
         return false;
       }
 
@@ -160,7 +164,7 @@ export class Blockchain {
         return false;
       }
 
-      if (!currentBlock.hasValidTransactions(this)) {
+      if (!Block.hasValidTransactions(currentBlock, this)) {
         return false;
       }
     }
@@ -181,7 +185,7 @@ export class Blockchain {
       return false;
     }
 
-    if (!transaction.isValid()) {
+    if (!Transaction.isValid(transaction)) {
       console.warn('TX: Cannot add invalid transaction to chain');
       return false;
     }

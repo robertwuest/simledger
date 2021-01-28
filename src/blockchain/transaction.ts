@@ -1,5 +1,5 @@
-import SmlCommon from "@/common";
-import { SHA256 } from "crypto-js";
+import { SHA256 } from 'crypto-js';
+import SmlCommon from '../common';
 
 /**
  * Transaction class
@@ -20,35 +20,35 @@ export class Transaction {
   /**
    * Generate hash for transaction
    */
-  generateHash() {
-    return SmlCommon.HexToBase58(SHA256(this.fromAddress + this.toAddress + this.amount).toString());
+  static generateHash(self: Transaction) {
+    return SmlCommon.HexToBase58(SHA256(self.fromAddress + self.toAddress + self.amount).toString());
   }
 
   /**
    * Sign the transaction
    */
-  signTransaction(signingKey: any) {
-    if (SmlCommon.HexToBase58(signingKey.getPublic(true,'hex')) !== this.fromAddress) {
+  static signTransaction(self: Transaction, signingKey: any) {
+    if (SmlCommon.HexToBase58(signingKey.getPublic(true, 'hex')) !== self.fromAddress) {
       throw new Error('You cannot sign transactions for other wallets!');
     }
 
-    const hashTx = this.generateHash();
+    const hashTx = Transaction.generateHash(self);
     const sig = signingKey.sign(hashTx, 'base64');
-    this.signature = sig.toDER('hex');
+    self.signature = sig.toDER('hex');
   }
 
   /**
    * Validate transaction
    */
-  isValid() {
-    if (this.fromAddress === '_') return true;
+  static isValid(self: Transaction) {
+    if (self.fromAddress === '_') return true;
 
-    if (!this.signature || this.signature.length === 0) {
+    if (!self.signature || self.signature.length === 0) {
       console.warn('TX: No signature in this transaction');
       return false;
     }
 
-    const publicKey = SmlCommon.curve.keyFromPublic(SmlCommon.Base58ToHex(this.fromAddress), 'hex');
-    return publicKey.verify(this.generateHash(), this.signature);
+    const publicKey = SmlCommon.curve.keyFromPublic(SmlCommon.Base58ToHex(self.fromAddress), 'hex');
+    return publicKey.verify(Transaction.generateHash(self), self.signature);
   }
 }

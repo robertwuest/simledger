@@ -1,13 +1,13 @@
-import {BehaviorSubject} from "rxjs";
-import {Block} from "@/blockchain/block";
-import {System} from "@/network/system";
-import {Tick} from "@/network/tick";
-import {Transaction} from "@/blockchain/transaction";
-import {Blockchain} from "@/blockchain/blockchain";
-import SmlCommon from "@/common";
+import { BehaviorSubject } from 'rxjs';
+import { Block } from '../blockchain/block';
+import { System } from './system';
+import { Tick } from './tick';
+import { Transaction } from '../blockchain/transaction';
+import { Blockchain } from '../blockchain/blockchain';
+import SmlCommon from '../common';
 
 export class SystemNode {
-  public static InactiveThreshold = 100;
+  public static InactiveThreshold = 20;
 
   public connectedNodes: {
     node: SystemNode,
@@ -15,32 +15,35 @@ export class SystemNode {
     txSub: any,
     bkSub: any,
   }[];
+  private system: System;
+  private keyPair: any;
+  private keyPairBS58: any;
 
-  private _system: System;
-  private _keyPair: any;
-  private _keyPairBS58: any;
+  private currentTick!: Tick;
+
   public id: string;
+  public isMining = false;
   public address: string;
   public blockchain: Blockchain;
   public broadcastBlock: BehaviorSubject<{ block: Block, sender: SystemNode }>;
-  public broadcastTransaction: BehaviorSubject<{ tx:Transaction, sender: SystemNode }>;
+  public broadcastTransaction: BehaviorSubject<{ tx: Transaction, sender: SystemNode }>;
 
   constructor(id: string, genesisAddress: string, system: System) {
     this.blockchain = new Blockchain(genesisAddress);
-    this.id  = id;
-    this._keyPair = SmlCommon.generateKeyPair();
-    this._keyPairBS58 = {
-      pub: SmlCommon.HexToBase58(this._keyPair.getPublic(true,'hex')),
-      pk: SmlCommon.HexToBase58(this._keyPair.getPrivate('hex')),
+    this.id = id;
+    this.keyPair = SmlCommon.generateKeyPair();
+    this.keyPairBS58 = {
+      pub: SmlCommon.HexToBase58(this.keyPair.getPublic(true, 'hex')),
+      pk: SmlCommon.HexToBase58(this.keyPair.getPrivate('hex')),
     };
-    this.address = this._keyPairBS58.pub;
+    this.address = this.keyPairBS58.pub;
     this.connectedNodes = [];
     // @ts-ignore
     this.broadcastBlock = new BehaviorSubject<{ block: Block, sender: SystemNode }>(null);
     // @ts-ignore
-    this.broadcastTransaction = new BehaviorSubject<{ tx:Transaction, sender: SystemNode }>(null);
-    this._system = system;
-    this._system.tick.subscribe(this.tick.bind(this));
+    this.broadcastTransaction = new BehaviorSubject<{ tx: Transaction, sender: SystemNode }>(null);
+    this.system = system;
+    this.system.tick.subscribe(this.tick.bind(this));
   }
 
   /**
@@ -53,7 +56,7 @@ export class SystemNode {
         node,
         inactiveCycles: 0,
         bkSub: node.broadcastBlock.subscribe(this.onNewBlock.bind(this)),
-        txSub: node.broadcastTransaction.subscribe(this.onNewTransaction.bind(this))
+        txSub: node.broadcastTransaction.subscribe(this.onNewTransaction.bind(this)),
       });
       node.connectToNode(this);
     }
@@ -68,15 +71,28 @@ export class SystemNode {
   }
 
   /**
+   * Try to mine a block
+   */
+  startMining(callback?: () => void) {
+    this.isMining = true;
+    this.blockchain.minePendingTransactions(this.keyPairBS58.pub, () => {
+      this.isMining = false;
+      if (callback) {
+        callback();
+      }
+    });
+  }
+
+  /**
    * Remove connected node due to inactivity
    * @param index
    */
   private forgetNode(index: number) {
-    const id = this.connectedNodes[index].node.id;
+    const { id } = this.connectedNodes[index].node;
     this.connectedNodes[index].bkSub.unsubscribe();
     this.connectedNodes[index].txSub.unsubscribe();
     this.connectedNodes.splice(index, 1);
-    console.log('Node removed due to inactivity: ' + id);
+    console.log(`Node removed due to inactivity: ${id}`);
   }
 
   /**
@@ -118,11 +134,12 @@ export class SystemNode {
    * @param cycleTick
    */
   private tick(cycleTick: Tick) {
+    this.currentTick = cycleTick;
     this.connectedNodes.forEach((item, index) => {
       if (item.inactiveCycles > SystemNode.InactiveThreshold) {
         this.forgetNode(index);
       } else {
-        item.inactiveCycles++;
+        item.inactiveCycles += 1;
       }
     });
   }

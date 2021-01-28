@@ -2,32 +2,25 @@ import { ec as EC } from 'elliptic';
 import base58 from 'bs58';
 
 export default class SmlCommon {
-    public static curve = new EC('secp256k1');
-    public static generateTimestamp() {
-        return (new Date()).getTime().toString();
-    }
+  public static curve = new EC('secp256k1');
 
-    public static generateKeyPair() {
-        // Generate a new key pair and convert them to hex-strings
-        const key = SmlCommon.curve.genKeyPair();
-        const publicKey = key.getPublic(true,'hex');
-        const privateKey = key.getPrivate('hex');
+  public static generateTimestamp() {
+    return (new Date()).getTime().toString();
+  }
 
-        // Print the keys to the console
-        /*console.log();
-        console.log('Your public key:', publicKey);
-        console.log();
-        console.log('Your private key', privateKey);*/
-        return key;
-    }
+  public static generateKeyPair() {
+    // Generate a new key pair and convert them to hex-strings
+    const key = SmlCommon.curve.genKeyPair();
+    return key;
+  }
 
-    public static HexToBase58(key: any) {
-        const bytes = Buffer.from(key, 'hex');
-        return base58.encode(bytes);
-    }
+  public static HexToBase58(key: any) {
+    const bytes = Buffer.from(key, 'hex');
+    return base58.encode(bytes);
+  }
 
-    public static Base58ToHex(key: any) {
-        const bytes = base58.decode(key);
-        return bytes.toString('hex');
-    }
+  public static Base58ToHex(key: any) {
+    const bytes = base58.decode(key);
+    return bytes.toString('hex');
+  }
 }

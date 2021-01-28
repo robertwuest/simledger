@@ -1,37 +1,39 @@
-import {BehaviorSubject} from "rxjs";
-import {Tick} from "@/network/tick";
+import { BehaviorSubject } from 'rxjs';
+import { Tick } from './tick';
 
 export class System {
-	public static CycleTime =  200;
-	public tick: BehaviorSubject<Tick>;
-	public stopFlag = false;
-	private _increment = 0;
-	private _elapsedTime = 0;
+  public static CycleTime = 200;
 
-	constructor() {
-		this.tick = new BehaviorSubject({ increment: this._increment, elapsedTime: this._elapsedTime});
-	}
+  public tick: BehaviorSubject<Tick>;
+  public stopFlag = false;
 
-	start() {
-		this.stopFlag = false;
-		this.run(0);
-	}
+  private increment = 0;
+  private elapsedTime = 0;
 
-	stop() {
-		this.stopFlag = true;
-	}
+  constructor() {
+    this.tick = new BehaviorSubject({ increment: this.increment, elapsedTime: this.elapsedTime });
+  }
 
-	/**
-	 * Main cycle event
-	 */
-	run(deltaTime: number) {
-		this._increment++;
-		this._elapsedTime += deltaTime;
-		this.tick.next({ increment: this._increment, elapsedTime: this._elapsedTime});
-		if (!this.stopFlag) {
-			setTimeout(() => {
-				this.run(System.CycleTime);
-			}, System.CycleTime);
-		}
-	}
+  start() {
+    this.stopFlag = false;
+    this.run(0);
+  }
+
+  stop() {
+    this.stopFlag = true;
+  }
+
+  /**
+   * Main cycle event
+   */
+  run(deltaTime: number) {
+    this.increment++;
+    this.elapsedTime += deltaTime;
+    this.tick.next({ increment: this.increment, elapsedTime: this.elapsedTime });
+    if (!this.stopFlag) {
+      setTimeout(() => {
+        this.run(System.CycleTime);
+      }, System.CycleTime);
+    }
+  }
 }
