@@ -28,5 +28,6 @@ module.exports = {
     'class-methods-use-this': 'off',
     'no-continue': 'off',
     'operator-linebreak': 'off',
+    'object-curly-newline': 'off',
   },
 };

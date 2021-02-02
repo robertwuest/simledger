@@ -1,4 +1,4 @@
-import { BehaviorSubject } from 'rxjs';
+import { BehaviorSubject, Subject } from 'rxjs';
 import { Block } from '../blockchain/block';
 import { System } from './system';
 import { Tick } from './tick';
@@ -8,6 +8,13 @@ import SmlCommon from '../common';
 
 export class SystemNode {
   public static InactiveThreshold = 20;
+  public static get events() {
+    return {
+      BROADCAST_TX: 'system_node_broadcast_transaction',
+      BROADCAST_BLOCK: 'system_node_broadcast_block',
+      START_MINING: 'system_node_start_mining',
+    };
+  }
 
   public connectedNodes: {
     node: SystemNode,
@@ -16,20 +23,21 @@ export class SystemNode {
     bkSub: any,
   }[];
   private system: System;
-  private keyPair: any;
+  public keyPair: any;
   private keyPairBS58: any;
-
   private currentTick!: Tick;
+  private tickQueue: any[];
 
   public id: string;
   public isMining = false;
   public address: string;
   public blockchain: Blockchain;
-  public broadcastBlock: BehaviorSubject<{ block: Block, sender: SystemNode }>;
-  public broadcastTransaction: BehaviorSubject<{ tx: Transaction, sender: SystemNode }>;
+  public broadcastBlock: BehaviorSubject<{ block: Block, sender: SystemNode, rewardTx: Transaction, referrer: SystemNode }>;
+  public broadcastTransaction: BehaviorSubject<{ tx: Transaction, sender: SystemNode, referrer: SystemNode }>;
+  public eventEmitter = new Subject();
 
-  constructor(id: string, genesisAddress: string, system: System) {
-    this.blockchain = new Blockchain(genesisAddress);
+  constructor(id: string, system: System) {
+    this.blockchain = new Blockchain();
     this.id = id;
     this.keyPair = SmlCommon.generateKeyPair();
     this.keyPairBS58 = {
@@ -39,10 +47,11 @@ export class SystemNode {
     this.address = this.keyPairBS58.pub;
     this.connectedNodes = [];
     // @ts-ignore
-    this.broadcastBlock = new BehaviorSubject<{ block: Block, sender: SystemNode }>(null);
+    this.broadcastBlock = new BehaviorSubject<{ block: Block, sender: SystemNode, referrer: SystemNode }>(null);
     // @ts-ignore
-    this.broadcastTransaction = new BehaviorSubject<{ tx: Transaction, sender: SystemNode }>(null);
+    this.broadcastTransaction = new BehaviorSubject<{ tx: Transaction, sender: SystemNode, referrer: SystemNode }>(null);
     this.system = system;
+    this.tickQueue = [];
     this.system.tick.subscribe(this.tick.bind(this));
   }
 
@@ -59,7 +68,9 @@ export class SystemNode {
         txSub: node.broadcastTransaction.subscribe(this.onNewTransaction.bind(this)),
       });
       node.connectToNode(this);
+      return true;
     }
+    return false;
   }
 
   /**
@@ -71,11 +82,40 @@ export class SystemNode {
   }
 
   /**
+   * Return balance of own address
+   */
+  getBalance() {
+    return this.blockchain.getBalanceOfAddress(this.address);
+  }
+
+  /**
+   * Sign and order a transaction
+   * @param fromAddress
+   * @param toAddress
+   * @param amount
+   * @param signingKey
+   */
+  orderTransaction(fromAddress: string, toAddress: string, amount: number, signingKey: any) {
+    const tx = new Transaction(fromAddress, toAddress, amount);
+    Transaction.signTransaction(tx, signingKey);
+    this.blockchain.addTransaction(tx);
+    this.pushToTickQueue(() => {
+      this.broadcastTransaction.next({ tx, sender: this, referrer: this });
+      this.eventEmitter.next({ msg: SystemNode.events.BROADCAST_TX, referrer: this });
+    });
+  }
+
+  /**
    * Try to mine a block
    */
   startMining(callback?: () => void) {
     this.isMining = true;
-    this.blockchain.minePendingTransactions(this.keyPairBS58.pub, () => {
+    this.eventEmitter.next({ msg: SystemNode.events.START_MINING });
+    this.blockchain.minePendingTransactions(this.keyPairBS58.pub, (newBlock, rewardTx) => {
+      this.pushToTickQueue(() => {
+        this.broadcastBlock.next({ block: newBlock, sender: this, rewardTx, referrer: this });
+        this.eventEmitter.next({ msg: SystemNode.events.BROADCAST_BLOCK, referrer: this });
+      });
       this.isMining = false;
       if (callback) {
         callback();
@@ -102,7 +142,7 @@ export class SystemNode {
   private onNewBlock(bcBlock: any) {
     if (bcBlock) {
       console.log('New block');
-      const { block, sender } = bcBlock;
+      const { block, sender, rewardTx } = bcBlock;
       if (!this.blockchain.addBlock(block)) {
         console.log('Adding new block failed');
         // try to synchronize
@@ -112,6 +152,12 @@ export class SystemNode {
             break;
           }
         }
+      } else {
+        this.blockchain.addTransaction(rewardTx);
+        this.pushToTickQueue(() => {
+          this.broadcastBlock.next({ block, sender: this, rewardTx, referrer: sender });
+          this.eventEmitter.next({ msg: SystemNode.events.BROADCAST_BLOCK, referrer: sender });
+        });
       }
     }
   }
@@ -122,11 +168,25 @@ export class SystemNode {
    */
   private onNewTransaction(bcTx: any) {
     if (bcTx) {
-      console.log('New transaction');
-      if (!this.blockchain.addTransaction(bcTx.tx)) {
+      console.log(`New transaction from ${bcTx.sender.id}`);
+      const { tx, sender } = bcTx;
+      if (!this.blockchain.addTransaction(tx)) {
         console.log('Adding new transaction failed');
+      } else {
+        this.pushToTickQueue(() => {
+          this.broadcastTransaction.next({ tx, sender: this, referrer: sender });
+          this.eventEmitter.next({ msg: SystemNode.events.BROADCAST_TX, referrer: sender });
+        });
       }
     }
+  }
+
+  /**
+   * Add a function to be executed on next tick of network system
+   * @param func
+   */
+  private pushToTickQueue(func: any) {
+    this.tickQueue.push({ func, tick: this.currentTick });
   }
 
   /**
@@ -137,10 +197,19 @@ export class SystemNode {
     this.currentTick = cycleTick;
     this.connectedNodes.forEach((item, index) => {
       if (item.inactiveCycles > SystemNode.InactiveThreshold) {
-        this.forgetNode(index);
+        // this.forgetNode(index);
       } else {
         item.inactiveCycles += 1;
       }
     });
+    for (let i = this.tickQueue.length - 1; i >= 0; i--) {
+      const item = this.tickQueue[i];
+      if (item.tick.increment < cycleTick.increment) {
+        this.tickQueue.splice(i, 1);
+        setTimeout(() => {
+          item.func();
+        }, 0);
+      }
+    }
   }
 }

@@ -8,9 +8,14 @@ export default class SmlCommon {
     return (new Date()).getTime().toString();
   }
 
-  public static generateKeyPair() {
+  public static generateKeyPair(privateKey?: string) {
     // Generate a new key pair and convert them to hex-strings
-    const key = SmlCommon.curve.genKeyPair();
+    let key;
+    if (privateKey) {
+      key = SmlCommon.curve.keyFromPrivate(SmlCommon.Base58ToHex(privateKey));
+    } else {
+      key = SmlCommon.curve.genKeyPair();
+    }
     return key;
   }
 

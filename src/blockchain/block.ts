@@ -58,7 +58,7 @@ export class Block {
       difficulty,
     });
     worker.addEventListener('message', (e) => {
-      console.log('Block received');
+      console.log(`%cBlock mined: ${e.data.hash}`, 'color: #00FF00');
       callback(e.data);
     });
   }
@@ -73,7 +73,7 @@ export class Block {
       if (tx.fromAddress === '_') {
         if (hasRewardTransaction) {
           // reject another reward transaction
-          console.log('BK: More than one reward transaction found');
+          console.warn('%cBlock: More than one reward transaction found', 'color: #F0F');
           return false;
         }
         hasRewardTransaction = true;
@@ -83,25 +83,25 @@ export class Block {
           continue;
         } else {
           // fraudulent reward address or invalid mining reward
-          console.log(`BK: Fraudulent reward address or invalid mining reward to recipient: ${tx.fromAddress}`);
+          console.warn(`%cBlock: Fraudulent reward address or invalid mining reward to recipient: ${tx.fromAddress}`, 'color: #F0F');
           return false;
         }
       }
       if (!Transaction.isValid(tx)) {
-        console.log(`BK: Cannot verify signature: ${tx.fromAddress}`);
+        console.warn(`%cBlock: Cannot verify signature: ${tx.fromAddress}`, 'color: #F0F');
         // signature check failed
         return false;
       }
       if (!balances.get(tx.fromAddress)) {
-        balances.set(tx.fromAddress, blockchain.getBalanceOfAddress(tx.fromAddress));
+        balances.set(tx.fromAddress, blockchain.getBalanceOfAddress(tx.fromAddress, self.length - 2));
       }
       if (balances.get(tx.fromAddress) - tx.amount < 0.0) {
-        console.log(`BK: Overspend from address: ${tx.fromAddress}`);
+        console.warn(`%cBlock: Overspend from address: ${tx.fromAddress}`, 'color: #F0F');
         return false;
       }
     }
     if (!hasRewardTransaction) {
-      console.log('BK: No reward transaction found');
+      console.warn('%cBlock: No reward transaction found', 'color: #F0F');
       return false;
     }
     return true;

@@ -2,7 +2,7 @@ import { BehaviorSubject } from 'rxjs';
 import { Tick } from './tick';
 
 export class System {
-  public static CycleTime = 200;
+  public static CycleTime = 2000;
 
   public tick: BehaviorSubject<Tick>;
   public stopFlag = false;

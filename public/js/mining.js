@@ -12,7 +12,6 @@
  * Mining function for a block
  */
 self.addEventListener('message', function(e) {
-	console.log(e);
 	var block = e.data.block;
 	var difficulty = e.data.difficulty;
 	while (
@@ -29,5 +28,4 @@ self.addEventListener('message', function(e) {
 		);
 	}
 	postMessage(block);
-	console.log("BLOCK MINED: " + block.hash);
 });
