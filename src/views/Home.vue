@@ -1,6 +1,6 @@
 <template>
   <div class="home">
-    <img alt="Vue logo" src="../assets/logo.png">
+    <img class="logo" alt="Vue logo" src="../assets/logo.png">
     <Dashboard />
   </div>
 </template>
@@ -16,3 +16,9 @@ import Dashboard from '@/components/Dashboard.vue'; // @ is an alias to /src
 })
 export default class Home extends Vue {}
 </script>
+
+<style lang="scss">
+  .logo {
+    height: 80px;
+  }
+</style>

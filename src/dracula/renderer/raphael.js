@@ -233,7 +233,7 @@ Raphael.fn.connection = function Connection(obj1, obj2, style) {
         edge.fg[move]({ path })
       } else {
         edge.fg = self.path(path)
-          .attr({ stroke: style && style.stroke || '#000', fill: 'none' })
+          .attr({ stroke: style && style.stroke || '#FFF', fill: 'none' })
           .toBack()
       }
       if (edge.bg) {

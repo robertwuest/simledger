@@ -1,0 +1,30 @@
+@import 'global/variables';
+@import 'global/_theming';
+@import 'vue-select/src/scss/vue-select.scss';
+
+body {
+  margin: 0;
+}
+
+input {
+  color: var(--text-color);
+}
+
+// vue-select class overrides
+.v-select {
+  background: var(--background-2-color);
+}
+.vs__selected,
+.vs__dropdown-option {
+  color: var(--text-color);
+}
+
+.vs__search::placeholder {
+  color: var(--frame-border);
+}
+
+.vs__dropdown-menu {
+  border-color: var(--frame-border);
+}
+
+

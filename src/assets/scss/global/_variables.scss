@@ -1,0 +1,12 @@
+@import 'theming';
+
+
+// vue-select overrides
+$vs-component-placeholder-color: inherit !default;
+
+//  Active State
+$vs-state-active-bg: var(--link-active-color);
+$vs-state-active-color: #fff;
+$vs-controls-color: var(--text-color);
+$vs-controls-deselect-text-shadow: 0 1px 0 #fff;
+$vs-dropdown-bg: var(--background-2-color);

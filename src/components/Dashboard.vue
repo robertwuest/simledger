@@ -7,27 +7,49 @@
       <div v-bind:class="{ 'nodes__node--mining' : node.systemNode.isMining === true }" class="nodes__node" v-for="node in nodes" :key="node.systemNode.id" :id="node.systemNode.id" >
         <h3>{{ node.systemNode.id }}</h3>
         <div>Balance: {{ node.systemNode.getBalance() }}</div>
+        <img class="nodes__node-process" src="../assets/icons/gears.svg" alt="" fill="#FF0000"/>
+      </div>
+    </div>
+    <div class="blockchain">
+      <v-select label="id" :options="getNodes" :clearable="false" :value="selectedNode ? selectedNode.id : 'Choose Node'" @input="updateSelectedNode($event.node)"></v-select>
+      <h4>Ledger</h4>
+      <div v-if="selectedNode" class="blockchain__ledger">
+        <ul v-for="block in selectedNode.blockchain.chain" :key="block.hash">
+          <li v-for="tx in block.transactions" :key="tx.hash">
+            [{{ tx.amount }}] <span v-html="findAddressId(tx.fromAddress)"></span> &rarr; <span v-html="findAddressId(tx.toAddress)"></span>
+          </li>
+        </ul>
+      </div>
+      <h4>Pending Transactions</h4>
+      <div v-if="selectedNode" class="blockchain__pending">
+        <ul>
+          <li v-for="tx in selectedNode.blockchain.pendingTransactions" :key="tx.hash">
+            [{{ tx.amount }}] <span v-html="findAddressId(tx.fromAddress)"></span> &rarr; <span v-html="findAddressId(tx.toAddress)"></span>
+          </li>
+        </ul>
+      </div>
+      <h4>Chain</h4>
+      <div v-if="selectedNode" class="blockchain__chain">
+        <span v-for="block in selectedNode.blockchain.chain" :key="block.length"><span class="blockchain__chain--block">Block_{{block.length}}</span> &rarr; </span>
       </div>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-/**
- * This code is based on the original implementations by Xavier Decuyper https://www.codementor.io/@savjee
- */
+
 import { gsap } from 'gsap';
 import { MotionPathPlugin } from 'gsap/MotionPathPlugin';
+import vSelect from 'vue-select';
 import { Component, Vue, Prop, Watch } from 'vue-property-decorator';
 import { SystemNode } from '../network/system_node';
 import SmlCommon from '../common';
 import Dracula from '../dracula';
-
 import { System } from '../network/system';
 
 gsap.registerPlugin(MotionPathPlugin);
+Vue.component('v-select', vSelect);
 
-// import { Blockchain } from '../blockchain/blockchain';
 /* eslint-disable */
 @Component
 export default class Dashboard extends Vue {
@@ -40,8 +62,21 @@ export default class Dashboard extends Vue {
   updateNodes() {
 
   }
+  get getNodes() {
+    return this.nodes.map((node) => {
+      return {
+        id: node.systemNode.id,
+        node: node.systemNode
+      };
+    });
+  }
+  selectedNode: SystemNode|null = null;
+  updateSelectedNode(node: any) {
+    this.selectedNode = node;
+  }
   visualGraph!: any;
   system!: System;
+  browserDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
 
   created() {
 
@@ -74,10 +109,10 @@ export default class Dashboard extends Vue {
     const graceNode = this.addNode('Grace');
     this.connectNodes(bobNode, aliceNode);
     this.connectNodes(aliceNode, frankNode);
-    this.connectNodes(aliceNode, graceNode);
+    this.connectNodes(frankNode, graceNode);
 
     const layout = new Dracula.Layout.Spring(this.visualGraph);
-    const renderer = new Dracula.Renderer.Raphael('#canvas', this.visualGraph, 900, 500);
+    const renderer = new Dracula.Renderer.Raphael('#canvas', this.visualGraph, 1024, 500);
 
     // refresh
     setTimeout(() => {
@@ -111,6 +146,20 @@ export default class Dashboard extends Vue {
     }, 1000);
   }
 
+  findAddressId(address: string) {
+    if (address === '_') {
+      return '&#9889;';
+    }
+    if (this.nodes.length > 0 && address === this.nodes[0].systemNode.blockchain.genesisAddress) {
+      return '&#127878; Genesis';
+    }
+    const node = this.nodes.find(item => item.systemNode.address === address);
+    if (node) {
+      return node.systemNode.id;
+    }
+    return `${address.substring(0, 6)}...`;
+  }
+
   /**
    * Add a new node to the network
    * @param id
@@ -134,7 +183,8 @@ export default class Dashboard extends Vue {
    */
   connectNodes(nodeA: any, nodeB: any) {
     if (nodeA.systemNode.connectToNode(nodeB.systemNode)){
-      this.visualGraph.addEdge(nodeA.systemNode.id, nodeB.systemNode.id);
+      const edgeColor = this.browserDarkMode ? 'whitesmoke' : '#1c2f21';
+      this.visualGraph.addEdge(nodeA.systemNode.id, nodeB.systemNode.id, { style: { stroke: edgeColor }});
     }
   }
 
@@ -149,13 +199,13 @@ export default class Dashboard extends Vue {
         if (event.msg === SystemNode.events.BROADCAST_TX) {
           if (sender.systemNode.id === event.referrer.id ||
             (edge.source.id !== event.referrer.id && edge.target.id !== event.referrer.id)) {
-            this.animateBroadcast('TX', 'txdiv', sender.graphRef.id, edge);
+            this.animateBroadcast('A → B', 'txdiv', sender.graphRef.id, edge);
           }
         }
         if (event.msg === SystemNode.events.BROADCAST_BLOCK) {
           if (sender.systemNode.id === event.referrer.id ||
             (edge.source.id !== event.referrer.id && edge.target.id !== event.referrer.id)) {
-            this.animateBroadcast('BLOCK', 'blockdiv', sender.graphRef.id, edge);
+            this.animateBroadcast('<img src="img/icons/block.svg" alt="" />', 'blockdiv', sender.graphRef.id, edge);
           }
         }
       });
@@ -170,6 +220,7 @@ export default class Dashboard extends Vue {
    * @param edge
    */
   animateBroadcast(content: string, cssClass: string, sourceId: string, edge: any) {
+    console.log(content);
     const element = document.createElement('div');
     const gsapAnimationObject = {
       duration: 2,
@@ -184,7 +235,7 @@ export default class Dashboard extends Vue {
       },
     };
     element.classList.add(cssClass);
-    element.innerText = content;
+    element.innerHTML = content;
     this.$el.appendChild(element);
     if (sourceId === edge.source.id) {
       gsap.to(element, gsapAnimationObject);
@@ -215,7 +266,6 @@ export default class Dashboard extends Vue {
 </script>
 
 <style lang="scss">
-
   h3 {
     margin: 40px 0 0;
   }
@@ -241,18 +291,87 @@ export default class Dashboard extends Vue {
     border-radius: 5px;
     line-height: 1;
     border: 1px solid grey;
-    background: cyan;
+    background: rgba(cyan, 0.6);
     animation: tx-fadeout 2s;
   }
 
   .blockdiv {
-    background: magenta;
+    background: rgba(magenta, 0.6);
+    img {
+      width: 25px;
+      height: 25px;
+    }
+  }
+
+  .blockchain {
+    position: fixed;
+    left: 0;
+    top:0;
+    height: 50vh;
+    width: 260px;
+    margin: 20px;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    text-align: left;
+    padding: 5px;
+    border: 2px solid var(--frame-border);
+
+    .vs__dropdown-toggle {
+      border: 1px solid var(--frame-border);
+    }
+
+    h4 {
+      margin: 0;
+    }
+
+    &__ledger,
+    &__pending,
+    &__chain {
+      font-family: monospace;
+      font-size: 10pt;
+      flex-grow: 1;
+      border: 1px solid var(--frame-border);
+      display: flex;
+      flex-direction: column;
+    }
+
+    &__ledger,
+    &__pending {
+      ul {
+        line-height: 1.5;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+
+        li {
+          background: rgba(cyan, 0.25);
+          border-radius: 3px;
+          margin: 1px;
+          vertical-align: baseline;
+        }
+      }
+    }
+
+    &__pending {
+      max-height: 80px;
+    }
+    &__chain {
+      max-height: 80px;
+      display: block;
+
+      &--block {
+        display: inline-block;
+        background: rgba(magenta, 0.25);
+        border-radius: 3px;
+        margin: 1px;
+      }
+    }
   }
 
   .nodes {
     display: flex;
     .canvas {
-      position: absolute;
       //z-index: -1;
       height: 75vh;
       width: 100%;
@@ -280,8 +399,22 @@ export default class Dashboard extends Vue {
         margin-left: 10px;
       }
 
+      &-process {
+        width: 30px;
+        height: 30px;
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        display: none;
+      }
+
       &--mining {
-        animation: pulse-animation 1s infinite;
+        .nodes__node-process {
+          display: block;
+          @media (prefers-color-scheme: light) {
+            filter: invert(1);
+          }
+        }
       }
     }
   }

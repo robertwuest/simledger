@@ -12,6 +12,7 @@
     "@types/crypto-js": "^4.0.1",
     "@types/elliptic": "^6.4.12",
     "@types/gsap": "^1.20.2",
+    "@types/vue-select": "^3.11.0",
     "bs58": "^4.0.1",
     "core-js": "^3.6.5",
     "crypto-js": "^4.0.0",
@@ -27,6 +28,7 @@
     "vue-class-component": "^7.2.3",
     "vue-property-decorator": "^9.1.2",
     "vue-router": "^3.2.0",
+    "vue-select": "^3.11.2",
     "vue-typescript": "^0.7.0",
     "vuex": "^3.6.2",
     "vuex-class": "^0.3.2"
