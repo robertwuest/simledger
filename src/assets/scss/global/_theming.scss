@@ -5,6 +5,7 @@
   --link-active-color: #8CC459;
   --link-color: #2c3e50;
   --frame-border: rgba(28, 47, 33, 0.75);
+  --shadow-color: #2c3e50;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -15,5 +16,6 @@
     --link-active-color: #8CC459;
     --link-color: #CCE9C8;
     --frame-border: rgba(245, 245, 245, 0.75);
+    --shadow-color: #8CC459;
   }
 }
