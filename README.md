@@ -1,5 +1,7 @@
 # SimLedger
 
+Graph Visualization adapted from http://raphaeljs.com/ and https://www.graphdracula.net/
+
 ## Project setup
 ```
 npm install
