@@ -1,8 +1,24 @@
 <template>
   <div class="sml-dashboard">
-    <h1>Dashboard</h1>
-    <GraphViewer ref="graphViewer" :selectedNodeId="selectedNodeId" :nodes="nodes" @node-clicked="onGraphNodeClicked"></GraphViewer>
-    <NodeExplorer ref="nodeExplorer" :nodes="nodes" @node-changed="onExplorerNodeChanged"></NodeExplorer>
+  <splitpanes class="default-theme" vertical style="height: calc(100vh - 167px)"
+              @resize="resizePane($event)"
+              @resized="paneResized($event)">
+    <pane size="65">
+        <div class="sml-dashboard__heading">Graph Viewer</div>
+        <GraphViewer ref="graphViewer" :selectedNodeId="selectedNodeId" :nodes="nodes" @node-clicked="onGraphNodeClicked"></GraphViewer>
+    </pane>
+    <pane>
+      <splitpanes class="default-theme" horizontal>
+        <pane>
+          <div class="sml-dashboard__heading">Explorer</div>
+          <NodeExplorer ref="nodeExplorer" :nodes="nodes" @node-changed="onExplorerNodeChanged"></NodeExplorer>
+        </pane>
+        <pane>
+          <div class="sml-dashboard__heading">Editor</div>
+        </pane>
+      </splitpanes>
+    </pane>
+  </splitpanes>
   </div>
 </template>
 
@@ -12,6 +28,8 @@ import { gsap } from 'gsap';
 import { MotionPathPlugin } from 'gsap/MotionPathPlugin';
 import { Component, Vue, Prop } from 'vue-property-decorator';
 import vSelect from 'vue-select';
+import { Splitpanes, Pane } from 'splitpanes';
+import 'splitpanes/dist/splitpanes.css';
 import GraphViewer from './GraphViewer.vue';
 import NodeExplorer from './NodeExplorer.vue';
 import { SystemNode } from '../network/system_node';
@@ -25,6 +43,8 @@ Vue.component('v-select', vSelect);
   components: {
     NodeExplorer,
     GraphViewer,
+    Splitpanes,
+    Pane,
   },
 })
 export default class Dashboard extends Vue {
@@ -42,7 +62,7 @@ export default class Dashboard extends Vue {
       };
     });
   }
-  selectedNodeId = 'asdasd';
+  selectedNodeId = '';
   graphViewer!: GraphViewer;
   nodeExplorer!: NodeExplorer;
   system!: System;
@@ -68,21 +88,22 @@ export default class Dashboard extends Vue {
 
     /* eslint-disable */
     setTimeout(() => {
-      // transfer initial coins to bob to start
-      this.orderTransaction(bobNode.systemNode.address, 100.0, genesisAcc, bobNode);
+      // transfer initial coins from genesis addres to bob to start the blockchain
+
 
       // bob mines the transactions including his own
       bobNode.systemNode.startMining(() => {
         setTimeout(() => {
-          this.orderTransaction(frankNode.systemNode.address, 50.0, bobNode.systemNode.keyPair, graceNode);
+          this.orderTransaction(SmlCommon.HexToBase58(genesisAcc.getPublic(true, 'hex')), bobNode.systemNode.address, 100.0, genesisAcc, bobNode);
           setTimeout(() => {
             frankNode.systemNode.startMining(() => {
+              this.orderTransaction(bobNode.systemNode.address, frankNode.systemNode.address, 50.0, bobNode.systemNode.keyPair, graceNode);
               setTimeout(() => {
                 aliceNode.systemNode.startMining();
-              }, 5000);
+              }, 10000);
             });
-          }, 5000);
-        },5000);
+          }, 10000);
+        },10000);
       });
     }, 1000);
     /* eslint-enable */
@@ -100,6 +121,14 @@ export default class Dashboard extends Vue {
       return node;
     }
     return this.nodes.find(item => item.systemNode.id === id);
+  }
+
+  resizePane(): any {
+    // resize event here
+  }
+
+  paneResized(): any {
+    this.graphViewer.onResize();
   }
 
   /**
@@ -122,7 +151,7 @@ export default class Dashboard extends Vue {
     const found = this.nodes.find((node) => { return node.systemNode.id === nodeId; });
 
     if (found) {
-      this.nodeExplorer.selectedNode = found.systemNode;
+      this.nodeExplorer.updateSelectedNode(found.systemNode);
       this.selectedNodeId = nodeId;
     }
   }
@@ -161,14 +190,15 @@ export default class Dashboard extends Vue {
 
   /**
    * Order a transaction on a specific node
+   * @param fromAddress
    * @param toAddress
    * @param amount
    * @param signingKey
    * @param issuingNode
    */
-  orderTransaction(toAddress: string, amount: number, signingKey: any, issuingNode: any) {
+  orderTransaction(fromAddress: string, toAddress: string, amount: number, signingKey: any, issuingNode: { systemNode: SystemNode }) {
     issuingNode.systemNode.orderTransaction(
-      SmlCommon.HexToBase58(signingKey.getPublic(true, 'hex')),
+      fromAddress,
       toAddress,
       amount,
       signingKey // eslint-disable-line
@@ -194,5 +224,33 @@ export default class Dashboard extends Vue {
 
   a {
     color: #42b983;
+  }
+
+  .sml-dashboard {
+    &__heading {
+      background: var(--background-2-color);
+      font-weight: bold;
+      text-align: left;
+      padding: 2px 5px;
+    }
+  }
+
+  .splitpanes {
+    &.default-theme {
+      .splitpanes__pane {
+        background-color: transparent;
+      }
+
+      &.splitpanes--vertical > .splitpanes__splitter,
+      &.splitpanes--horizontal > .splitpanes__splitter {
+        background-color: var(--link-active-color);
+        border-color: transparent;
+
+        &:before,
+        &:after {
+          background-color: var(--background-2-color);
+        }
+      }
+    }
   }
 </style>

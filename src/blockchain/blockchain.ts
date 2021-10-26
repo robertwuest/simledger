@@ -14,8 +14,8 @@ export class Blockchain {
   genesisAddress: string;
 
   constructor() {
-    // assume a value for difficulty
-    this.difficulty = 5;
+    // assume a value for difficulty - when using simulated delay it should be set 1
+    this.difficulty = 1;
     // Place to store transactions in between block creation
     this.pendingTransactions = [];
     // How many coins a miner will get as a reward for his/her efforts

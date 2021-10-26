@@ -37,13 +37,12 @@ const dragify = (shape) => {
         this.set.ox = x;
         this.set.oy = y;
         const shapeBounds = this.node.getBoundingClientRect();
-        //console.log(`x: ${x} y: ${y}`);
-        //console.log(`bx: ${shapeBounds.x} by: ${shapeBounds.y}`);
-        //console.log(shapeBounds);
+        const parentBounds = this.node.parentElement.getBoundingClientRect();
+
         const event = new CustomEvent('shapeDragMove', { detail: {
             item,
-            x: shapeBounds.x,
-            y: shapeBounds.y,
+            x: shapeBounds.x - parentBounds.x,
+            y: shapeBounds.y - parentBounds.y,
           }
         });
         window.dispatchEvent(event);

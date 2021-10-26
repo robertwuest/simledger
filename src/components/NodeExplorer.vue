@@ -1,8 +1,6 @@
 <template>
   <div class="sml-node-explorer__container">
-  <vue-resizable :drag-selector="'.sml-node-explorer__header'">
     <div class="sml-node-explorer">
-      <div class="sml-node-explorer__header">Node Explorer</div>
       <v-select label="id" :options="getNodes" :clearable="false" :value="selectedNode ? selectedNode.id : 'Choose Node'" @input="updateSelectedNode($event.node)"></v-select>
       <div v-if="selectedNode" class="sml-node-explorer__ledger">
         <h4>Ledger</h4>
@@ -22,10 +20,17 @@
       </div>
       <div v-if="selectedNode" class="sml-node-explorer__chain">
         <h4>Chain</h4>
-        <span v-for="block in selectedNode.blockchain.chain" :key="block.length"><span class="sml-node-explorer__chain-block">Block_{{block.length}}</span> &rarr; </span>
+        <span v-for="block in selectedNode.blockchain.chain" :key="block.length"><span class="sml-node-explorer__chain-block" v-bind:class="{ 'sml-node-explorer__chain-block--selected': selectedBlockIndex === block.length - 1 }" v-on:click="selectedBlockIndex = block.length - 1">Block_{{block.length - 1 > 0 ? block.length - 1: '&#127878;'}}</span> &rarr; </span>
+        <div v-if="selectedNode && selectedBlockIndex >= 0">
+          <h5>Explore: Block_{{selectedBlockIndex}}</h5>
+          <ul>
+            <li v-for="tx in selectedNode.blockchain.chain[selectedBlockIndex].transactions" :key="tx.hash">
+              [{{ tx.amount }}] <span v-html="findAddressId(tx.fromAddress)"></span> &rarr; <span v-html="findAddressId(tx.toAddress)"></span>
+            </li>
+          </ul>
+        </div>
       </div>
     </div>
-  </vue-resizable>
   </div>
 </template>
 
@@ -55,8 +60,11 @@ export default class NodeExplorer extends Vue {
     });
   }
   selectedNode: SystemNode|null = null;
+  selectedBlockIndex = -1;
+
   updateSelectedNode(node: any) {
     this.selectedNode = node;
+    this.selectedBlockIndex = -1;
     if (this.selectedNode) {
       this.$emit('node-changed', this.selectedNode.id);
     }
@@ -80,29 +88,17 @@ export default class NodeExplorer extends Vue {
 
 <style lang="scss">
   .sml-node-explorer {
-    height: 600px;
-    width: 260px;
     border-radius: 8px;
     display: flex;
     flex-direction: column;
     text-align: left;
     padding: 5px;
-    border: 2px solid var(--frame-border);
-    background: var(--background-color);
-    box-shadow: 0 0 8px var(--shadow-color);
-
-    &__container {
-      position: fixed;
-      top: 25px;
-      left: 25px;
-      z-index: 200;
-    }
 
     .vs__dropdown-toggle {
       border: 1px solid var(--frame-border);
     }
 
-    h4 {
+    h4, h5 {
       margin: 0;
     }
 
@@ -130,7 +126,8 @@ export default class NodeExplorer extends Vue {
     }
 
     &__ledger,
-    &__pending {
+    &__pending,
+    &__chain {
       ul {
         line-height: 1.5;
         margin: 0;
@@ -150,7 +147,6 @@ export default class NodeExplorer extends Vue {
       max-height: 80px;
     }
     &__chain {
-      max-height: 80px;
       display: block;
 
       &-block {
@@ -160,6 +156,13 @@ export default class NodeExplorer extends Vue {
         background: rgba(magenta, 0.25);
         border-radius: 3px;
         margin: 1px;
+        cursor: pointer;
+        line-height: 1;
+        padding: 4px 2px;
+
+        &--selected {
+          border: 1px solid var(--frame-border);
+        }
       }
     }
   }

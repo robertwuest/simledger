@@ -26,9 +26,12 @@ export class SystemNode {
   public keyPair: any;
   private keyPairBS58: any;
   private currentTick!: Tick;
-  private tickQueue: any[];
+  public remainingMiningDelay = 0;
+  private readonly tickQueue: any[];
+  private rollSeed = Math.floor(Math.random() * Math.floor(0xFFFF));
 
   public id: string;
+  public miningDelay = 0;
   public isMining = false;
   public address: string;
   public blockchain: Blockchain;
@@ -106,20 +109,26 @@ export class SystemNode {
   }
 
   /**
-   * Try to mine a block
+   * Begin mining a new block and return the callback function when completed
+   * This functions simulates the mining efforts with an artificial delay in addition to a given
+   * difficulty. The calculatedMiningDelay can be set to be always 0 to deactivate this mechanic.
+   * This is suitable in case you want to use an actual proof of work algorithm
+   * @param callback
    */
   startMining(callback?: () => void) {
+    this.miningDelay = SmlCommon.RandomSeed(0, 5, this.currentTick.increment + this.rollSeed);
+    this.remainingMiningDelay = this.miningDelay;
     this.isMining = true;
     this.eventEmitter.next({ msg: SystemNode.events.START_MINING });
     this.blockchain.minePendingTransactions(this.keyPairBS58.pub, (newBlock, rewardTx) => {
       this.pushToTickQueue(() => {
         this.broadcastBlock.next({ block: newBlock, sender: this, rewardTx, referrer: this });
         this.eventEmitter.next({ msg: SystemNode.events.BROADCAST_BLOCK, referrer: this });
-      });
-      this.isMining = false;
-      if (callback) {
-        callback();
-      }
+        this.isMining = false;
+        if (callback) {
+          callback();
+        }
+      }, this.remainingMiningDelay);
     });
   }
 
@@ -184,9 +193,10 @@ export class SystemNode {
   /**
    * Add a function to be executed on next tick of network system
    * @param func
+   * @param delay simulate mining delay for playback. For real time application this is always 0
    */
-  private pushToTickQueue(func: any) {
-    this.tickQueue.push({ func, tick: this.currentTick });
+  private pushToTickQueue(func: any, delay = 0) {
+    this.tickQueue.push({ func, tick: this.currentTick, delay });
   }
 
   /**
@@ -204,12 +214,19 @@ export class SystemNode {
     });
     for (let i = this.tickQueue.length - 1; i >= 0; i--) {
       const item = this.tickQueue[i];
-      if (item.tick.increment < cycleTick.increment) {
+      if (item.tick.increment < (cycleTick.increment - item.delay)) {
         this.tickQueue.splice(i, 1);
         setTimeout(() => {
           item.func();
         }, 0);
       }
     }
+    if (this.remainingMiningDelay > 0) {
+      this.remainingMiningDelay -= 1;
+    }
+  }
+
+  getRemainingMiningDelayPercentage() {
+    return ((this.miningDelay - this.remainingMiningDelay) / this.miningDelay) * 100;
   }
 }

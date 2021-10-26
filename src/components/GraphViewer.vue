@@ -1,12 +1,17 @@
 <template>
-  <div class="sml-graph-viewer">
+  <div class="sml-graph-viewer" ref="graphViewer">
     <div class="sml-graph-viewer__nodes">
       <div id="canvas" class="canvas">
       </div>
-      <div v-bind:class="{ 'sml-graph-viewer__node--mining' : node.systemNode.isMining === true, 'sml-graph-viewer__node--selected': node.systemNode.id === selectedNodeId }" class="sml-graph-viewer__node" v-for="node in nodes" :key="node.systemNode.id" :id="node.systemNode.id" >
+      <div v-bind:class="{ 'sml-graph-viewer__node--mining' : node.systemNode.isMining === true, 'sml-graph-viewer__node--selected': node.systemNode.id === selectedNodeId }"
+           class="sml-graph-viewer__node"
+           v-for="node in nodes"
+           :key="node.systemNode.id" :id="node.systemNode.id" >
         <h3>{{ node.systemNode.id }}</h3>
         <div>Balance: {{ node.systemNode.getBalance() }}</div>
         <img class="sml-graph-viewer__node-process" src="../assets/icons/gears.svg" alt="" fill="#FF0000"/>
+        <img class="sml-graph-viewer__node-pow-lottery" :src="`/img/icons/die${ node.systemNode.miningDelay + 1 }.svg`" alt=""/>
+        <div class="sml-graph-viewer__node-progress-bar"><span v-bind:style="{ width: `${ node.systemNode.getRemainingMiningDelayPercentage() }%` }"></span></div>
       </div>
     </div>
   </div>
@@ -31,6 +36,8 @@ export default class GraphViewer extends Vue {
   @Prop() selectedNodeId!: string;
   visualGraph!: any;
   browserDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  renderer: any;
+  layout: any;
 
   mounted() {
     window.addEventListener('shapeDragMove', (event: any) => {
@@ -41,27 +48,36 @@ export default class GraphViewer extends Vue {
           return node.graphRef.shape.items.find((shapeItem:any) => shapeItem.id === event.detail.item.id);
         });
         if (item && item.element) {
-          item.element.style.transform = `translate(${event.detail.x + window.scrollX}px, ${event.detail.y + window.scrollY}px)`;
+          item.element.style.transform = `translate(${event.detail.x}px, ${event.detail.y}px)`;
         }
       }
     });
 
     this.visualGraph = new Dracula.Graph();
-
     // refresh
     setTimeout(() => {
+      const element = this.$refs.graphViewer as HTMLDivElement;
       // eslint-disable-next-line
-      const layout = new Dracula.Layout.Spring(this.visualGraph);
-      const renderer = new Dracula.Renderer.Raphael('#canvas', this.visualGraph, 1024, 500);
-      renderer.draw();
+      this.layout = new Dracula.Layout.Spring(this.visualGraph);
+      this.renderer = new Dracula.Renderer.Raphael('#canvas', this.visualGraph, element.clientWidth, element.clientHeight);
+      this.renderer.draw();
       this.nodes.forEach((node: any) => {
         if (!node.element) {
           node.element = document.querySelector(`#${node.systemNode.id}`);
           const shapeBounds = node.graphRef.shape.items[0].node.getBoundingClientRect();
-          node.element.style.transform = `translate(${shapeBounds.x + window.scrollX}px, ${shapeBounds.y + window.scrollY}px)`;
+          const parentBounds = node.graphRef.shape.items[0].node.parentElement.getBoundingClientRect();
+          node.element.style.transform = `translate(${shapeBounds.x - parentBounds.x}px, ${shapeBounds.y - parentBounds.y}px)`;
         }
       });
     }, 1);
+  }
+
+  /**
+   * Resize  canvas
+   */
+  onResize() {
+    const element = this.$refs.graphViewer as HTMLDivElement;
+    this.renderer.canvas.setSize(element.clientWidth, element.clientHeight);
   }
 
   /**
@@ -96,7 +112,6 @@ export default class GraphViewer extends Vue {
    * @param edge
    */
   animateBroadcast(content: string, cssClass: string, sourceId: string, edge: any) {
-    console.log(content);
     const element = document.createElement('div');
     const gsapAnimationObject = {
       duration: 2,
@@ -124,6 +139,9 @@ export default class GraphViewer extends Vue {
 
 <style lang="scss">
   .sml-graph-viewer {
+    position: relative;
+    height: 100%;
+
     &__txdiv,
     &__blockdiv {
       position: absolute;
@@ -146,10 +164,12 @@ export default class GraphViewer extends Vue {
 
     &__nodes {
       display: flex;
+      height: 100%;
 
       .canvas {
-        height: 75vh;
+        height: 100%;
         width: 100%;
+        text-align: left;
       }
     }
 
@@ -183,6 +203,39 @@ export default class GraphViewer extends Vue {
         display: none;
       }
 
+      &-pow-lottery {
+        width: 25px;
+        height: 25px;
+        position: absolute;
+        bottom: 5px;
+        right: 5px;
+        display: none;
+      }
+
+      &-progress-bar {
+        display: none;
+        border: 1px solid white;
+        border-radius: 6px;
+        margin-top: 3px;
+        width: 65%;
+        padding: 1px;
+        @media (prefers-color-scheme: light) {
+          border-color: black;
+        }
+
+        span {
+          display: block;
+          width: 0;
+          height: 8px;
+          background-color: white;
+          border-radius: 4px;
+          transition: width 0.2s ease;
+          @media (prefers-color-scheme: light) {
+            background-color: black;
+          }
+        }
+      }
+
       &--mining {
         .sml-graph-viewer__node-process {
           display: block;
@@ -190,19 +243,16 @@ export default class GraphViewer extends Vue {
             filter: invert(1);
           }
         }
+
+        .sml-graph-viewer__node-pow-lottery,
+        .sml-graph-viewer__node-progress-bar
+        {
+          display: block;
+        }
       }
 
       &--selected {
         box-shadow: 0 0 12px var(--shadow-color);
-      }
-    }
-
-    @keyframes pulse-animation {
-      0% {
-        box-shadow: 0 0 0 0px rgba(255, 0, 0, 0.4);
-      }
-      100% {
-        box-shadow: 0 0 0 20px rgba(255, 0, 0, 0);
       }
     }
 
