@@ -30,6 +30,7 @@ export class SystemNode {
   public remainingMiningDelay = 0;
   private readonly tickQueue: any[];
   private rollSeed = Math.floor(Math.random() * Math.floor(0xFFFF));
+  private freezeTransactions = false;
 
   public id: string;
   public miningDelay = 0;
@@ -68,12 +69,14 @@ export class SystemNode {
    */
   connectToNode(node: SystemNode) {
     if (!this.connectedNodes.find(item => item.node === node)) {
+      this.freezeTransactions = true;
       this.connectedNodes.push({
         node,
         inactiveCycles: 0,
         bkSub: node.broadcastBlock.subscribe(this.onNewBlock.bind(this)),
         txSub: node.broadcastTransaction.subscribe(this.onNewTransaction.bind(this)),
       });
+
       node.connectToNode(this);
       return true;
     }
@@ -148,15 +151,17 @@ export class SystemNode {
   }
 
   /**
-   * Remove connected node due to inactivity
-   * @param index
+   * Remove connected node
+   * @param id
    */
-  private forgetNode(index: number) {
-    const { id } = this.connectedNodes[index].node;
-    this.connectedNodes[index].bkSub.unsubscribe();
-    this.connectedNodes[index].txSub.unsubscribe();
-    this.connectedNodes.splice(index, 1);
-    console.log(`Node removed due to inactivity: ${id}`);
+  public forgetNode(id: string) {
+    const node = this.connectedNodes.find(nd => nd.node.id === id);
+    const index = this.connectedNodes.findIndex(nd => nd.node.id === id);
+    if (node) {
+      node.bkSub.unsubscribe();
+      node.txSub.unsubscribe();
+      this.connectedNodes.splice(index, 1);
+    }
   }
 
   /**
@@ -169,12 +174,33 @@ export class SystemNode {
       const { block, sender, rewardTx } = bcBlock;
       if (!this.blockchain.addBlock(block)) {
         console.log('Adding new block failed');
-        // try to synchronize
-        for (let i = this.blockchain.getBlockchainLength() + 1; i <= block.length; i++) {
-          if (!this.blockchain.addBlock(sender.getBlock(i))) {
-            console.log('Synchronization failed');
-            break;
+
+        let divertingChain = false;
+        if (this.blockchain.getBlockchainLength() < sender.blockchain.getBlockchainLength()) {
+          for (let i = 0; i < sender.blockchain.getBlockchainLength(); i++) {
+            if (i >= this.blockchain.getBlockchainLength()) {
+              if (!this.blockchain.addBlock(sender.getBlock(i))) {
+                console.log('Synchronization failed 0');
+                break;
+              }
+              continue;
+            }
+            if (divertingChain || this.getBlock(i).hash !== sender.getBlock(i).hash) {
+              divertingChain = true;
+              if (!this.blockchain.addBlock(sender.getBlock(i))) {
+                console.log('Synchronization failed 1');
+                break;
+              }
+            }
           }
+          const exisitingTransactions = this.blockchain.pendingTransactions.filter(tx => tx.fromAddress !== '_');
+          this.blockchain.pendingTransactions = sender.blockchain.pendingTransactions.concat(exisitingTransactions);
+          exisitingTransactions.forEach((tx) => {
+            this.pushToTickQueue(() => {
+              this.broadcastTransaction.next({ tx, sender: this, referrer: this });
+              this.eventEmitter.next({ msg: SystemNode.events.BROADCAST_TX, referrer: this });
+            });
+          });
         }
       } else {
         this.blockchain.addTransaction(rewardTx);
@@ -191,6 +217,10 @@ export class SystemNode {
    * @param bcTx
    */
   private onNewTransaction(bcTx: any) {
+    if (this.freezeTransactions) {
+      this.freezeTransactions = false;
+      return;
+    }
     if (bcTx) {
       console.log(`New transaction from ${bcTx.sender.id}`);
       const { tx, sender } = bcTx;
@@ -220,7 +250,7 @@ export class SystemNode {
    */
   private tick(cycleTick: Tick) {
     this.currentTick = cycleTick;
-    this.connectedNodes.forEach((item, index) => {
+    this.connectedNodes.forEach((item) => {
       if (item.inactiveCycles > SystemNode.InactiveThreshold) {
         // this.forgetNode(index);
       } else {

@@ -1,11 +1,11 @@
 <template>
   <div class="sml-graph-viewer" ref="graphViewer">
     <div class="sml-graph-viewer__nodes">
-      <div id="canvas" class="canvas">
+      <div id="canvas" class="canvas" v-on:click="closeAllContextMenus()">
       </div>
       <div v-bind:class="{ 'sml-graph-viewer__node--mining' : node.systemNode.isMining === true, 'sml-graph-viewer__node--selected': node.systemNode.id === selectedNodeId }"
            class="sml-graph-viewer__node"
-           v-for="node in nodes"
+           v-for="(node, index) in nodes"
            :key="node.systemNode.id" :id="node.systemNode.id" >
         <h3>{{ node.systemNode.id }}</h3>
         <div>Balance: {{ node.systemNode.getBalance() }}</div>
@@ -13,6 +13,16 @@
         <img class="sml-graph-viewer__node-pow-lottery" :src="`/img/icons/die${ node.systemNode.miningDelay + 1 }.svg`" alt=""/>
         <div class="sml-graph-viewer__node-progress-bar"><span v-bind:style="{ width: `${ node.systemNode.getRemainingMiningDelayPercentage() }%` }"></span></div>
         <img class="sml-graph-viewer__node-error" :src="`/img/icons/error.svg`" alt=""/>
+        <div class="sml-graph-viewer__node-connector">
+          <img class="connect" :src="`/img/icons/connect.svg`" alt="" v-on:click="$event.target.parentElement.classList.toggle('open'); $event.stopPropagation()"/>
+          <div class="c-menu">
+            <div class="c-menu-item" v-for="subNode in nodes.filter(nd => nd.systemNode.id !== node.systemNode.id)" :key="`${subNode.systemNode.id}-menu-${index}`" v-on:click="connectDisconnectNodes(subNode.systemNode, node.systemNode)">
+              {{subNode.systemNode.id}}
+              <img v-if="node.systemNode.connectedNodes.find(nd => nd.node.id === subNode.systemNode.id)" :src="`/img/icons/connected.svg`" alt=""/>
+              <img v-if="!node.systemNode.connectedNodes.find(nd => nd.node.id === subNode.systemNode.id)" :src="`/img/icons/disconnected.svg`" alt=""/>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -42,6 +52,7 @@ export default class GraphViewer extends Vue {
 
   mounted() {
     window.addEventListener('shapeDragMove', (event: any) => {
+      this.closeAllContextMenus();
       if (this.nodes) {
         // eslint-disable-next-line
         const item = this.nodes.find((node: any) => {
@@ -71,6 +82,12 @@ export default class GraphViewer extends Vue {
         }
       });
     }, 1);
+  }
+
+  closeAllContextMenus() {
+    this.nodes.forEach((node: any) => {
+      node.element.querySelector('.sml-graph-viewer__node-connector').classList.remove('open');
+    });
   }
 
   /**
@@ -103,6 +120,33 @@ export default class GraphViewer extends Vue {
   connectNodes(nodeAId: string, nodeBId: string) {
     const edgeColor = this.browserDarkMode ? 'whitesmoke' : '#1c2f21';
     this.visualGraph.addEdge(nodeAId, nodeBId, { style: { stroke: edgeColor } });
+  }
+
+  /**
+   * Release a virtual connection between to nodes of the network
+   * @param nodeAId
+   * @param nodeBId
+   */
+  disconnectNodes(nodeAId: string, nodeBId: string) {
+    this.visualGraph.removeEdge(nodeAId, nodeBId);
+  }
+
+  /**
+   * Handle connect and disconnect of nodes via event
+   * @param nodeA
+   * @param nodeB
+   */
+  connectDisconnectNodes(nodeA, nodeB) {
+    if (nodeA.connectedNodes.find(nd => nd.node.id === nodeB.id)) {
+      nodeA.forgetNode(nodeB.id);
+      nodeB.forgetNode(nodeA.id);
+      this.disconnectNodes(nodeA.id, nodeB.id);
+      return;
+    }
+    if (nodeA.connectToNode(nodeB)) {
+      this.connectNodes(nodeA.id, nodeB.id);
+    }
+    this.renderer.draw();
   }
 
   /**
@@ -191,7 +235,7 @@ export default class GraphViewer extends Vue {
         margin: 10px 0 0 10px;
       }
 
-      div {
+      > div {
         margin-left: 10px;
       }
 
@@ -269,7 +313,64 @@ export default class GraphViewer extends Vue {
         }
       }
 
+      &-connector {
+        pointer-events: all;
+        position: absolute;
+        top: 5px;
+        right: 5px;
+
+        .connect {
+          width: 22px;
+          height: 22px;
+
+          @media (prefers-color-scheme: dark) {
+            filter: invert(1);
+          }
+        }
+
+        &.open {
+          .c-menu {
+            display: block;
+          }
+        }
+
+        .c-menu {
+          display: none;
+          position: absolute;
+          border: 1px solid var(--frame-border);
+          border-radius: 4px;
+          right: 0;
+          bottom: 100%;
+
+          &-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 2px 4px;
+            background-color: var(--background-color);
+            cursor: pointer;
+
+            &:hover {
+              background-color: var(--background-2-color);
+            }
+
+            img {
+              width: 16px;
+              margin-left: 5px;
+
+              @media (prefers-color-scheme: dark) {
+                filter: invert(1);
+              }
+            }
+          }
+
+        }
+      }
+
       &--mining {
+        .sml-graph-viewer__node-connector {
+          display: none;
+        }
+
         .sml-graph-viewer__node-process {
           display: block;
           @media (prefers-color-scheme: light) {
