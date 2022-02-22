@@ -1,5 +1,5 @@
 import { SHA256 } from 'crypto-js';
-import { Transaction } from './transaction';
+import { Transaction } from './transaction'; // eslint-disable-line
 import { Blockchain } from './blockchain'; // eslint-disable-line
 
 /**
@@ -69,11 +69,12 @@ export class Block {
   static hasValidTransactions(self: Block, blockchain: Blockchain) {
     const balances = new Map();
     let hasRewardTransaction = false;
+    let hasTransactions = false;
     for (const tx of self.transactions) {
       if (tx.fromAddress === '_') {
         if (hasRewardTransaction) {
           // reject another reward transaction
-          console.warn('%cBlock: More than one reward transaction found', 'color: #F0F');
+          blockchain.log('warn', '%cBlock: More than one reward transaction found', 'color: #F0F');
           return false;
         }
         hasRewardTransaction = true;
@@ -83,12 +84,15 @@ export class Block {
           continue;
         } else {
           // fraudulent reward address or invalid mining reward
-          console.warn(`%cBlock: Fraudulent reward address or invalid mining reward to recipient: ${tx.fromAddress}`, 'color: #F0F');
+          blockchain.log('warn', `%cBlock: Fraudulent reward address or invalid mining reward to recipient: ${tx.fromAddress}`, 'color: #F0F');
           return false;
         }
+      } else {
+        hasTransactions = true;
       }
-      if (!Transaction.isValid(tx)) {
-        console.warn(`%cBlock: Cannot verify signature: ${tx.fromAddress}`, 'color: #F0F');
+
+      if (!Transaction.isValid(tx, blockchain)) {
+        blockchain.log('warn', `%cBlock: Transaction invalid or cannot verify signature: ${tx.fromAddress}`, 'color: #F0F');
         // signature check failed
         return false;
       }
@@ -96,12 +100,16 @@ export class Block {
         balances.set(tx.fromAddress, blockchain.getBalanceOfAddress(tx.fromAddress, self.length - 2));
       }
       if (balances.get(tx.fromAddress) - tx.amount < 0.0) {
-        console.warn(`%cBlock: Overspend from address: ${tx.fromAddress}`, 'color: #F0F');
+        blockchain.log('warn', `%cBlock: Overspend from address: ${tx.fromAddress}`, 'color: #F0F');
         return false;
       }
     }
-    if (!hasRewardTransaction) {
-      console.warn('%cBlock: No reward transaction found', 'color: #F0F');
+    if (!hasRewardTransaction && blockchain.getLatestBlock().previousHash !== 'genesisHash') {
+      blockchain.log('warn', '%cBlock: No reward transaction found', 'color: #F0F');
+      return false;
+    }
+    if (!hasTransactions) {
+      blockchain.log('warn', '%cBlock: No transaction found', 'color: #F80');
       return false;
     }
     return true;

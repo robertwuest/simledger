@@ -29,5 +29,6 @@ module.exports = {
     'no-continue': 'off',
     'operator-linebreak': 'off',
     'object-curly-newline': 'off',
+    'guard-for-in': 'off'
   },
 };

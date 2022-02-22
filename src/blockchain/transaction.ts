@@ -14,7 +14,7 @@ export class Transaction {
   constructor(fromAddress: string, toAddress: string, amount: number) {
     this.fromAddress = fromAddress;
     this.toAddress = toAddress;
-    this.amount = amount;
+    this.amount = typeof amount === 'string' ? parseFloat(amount) : amount;
   }
 
   /**
@@ -40,15 +40,26 @@ export class Transaction {
   /**
    * Validate transaction
    */
-  static isValid(self: Transaction) {
+  static isValid(self: Transaction, blockchain: any) {
     if (self.fromAddress === '_') return true;
 
+    if (self.fromAddress === self.toAddress) {
+      blockchain.log('warn', '%cTX: Sender address is same as receiver', 'color: #F0F');
+      return false;
+    }
+
     if (!self.signature || self.signature.length === 0) {
-      console.warn('TX: No signature in this transaction');
+      blockchain.log('warn', '%cTX: No signature found in this transaction', 'color: #F0F');
       return false;
     }
 
     const publicKey = SmlCommon.curve.keyFromPublic(SmlCommon.Base58ToHex(self.fromAddress), 'hex');
-    return publicKey.verify(Transaction.generateHash(self), self.signature);
+    const verified = publicKey.verify(Transaction.generateHash(self), self.signature);
+
+    if (!verified) {
+      blockchain.log('warn', '%cTX: Signature did not verify', 'color: #F0F');
+    }
+
+    return verified;
   }
 }

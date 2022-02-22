@@ -13,6 +13,7 @@ export class SystemNode {
       BROADCAST_TX: 'system_node_broadcast_transaction',
       BROADCAST_BLOCK: 'system_node_broadcast_block',
       START_MINING: 'system_node_start_mining',
+      MESSAGE: 'system_node_message',
     };
   }
 
@@ -56,6 +57,9 @@ export class SystemNode {
     this.system = system;
     this.tickQueue = [];
     this.system.tick.subscribe(this.tick.bind(this));
+    this.blockchain.registerLogSubscriber((type, message) => {
+      this.eventEmitter.next({ msg: SystemNode.events.MESSAGE, referrer: this, payload: { type, message } });
+    });
   }
 
   /**
@@ -121,14 +125,25 @@ export class SystemNode {
     this.isMining = true;
     this.eventEmitter.next({ msg: SystemNode.events.START_MINING });
     this.blockchain.minePendingTransactions(this.keyPairBS58.pub, (newBlock, rewardTx) => {
-      this.pushToTickQueue(() => {
-        this.broadcastBlock.next({ block: newBlock, sender: this, rewardTx, referrer: this });
-        this.eventEmitter.next({ msg: SystemNode.events.BROADCAST_BLOCK, referrer: this });
+      if (newBlock) {
+        this.pushToTickQueue(() => {
+          // Reset the pending transactions and send the mining reward
+          // Add the newly mined block to the chain
+          if (this.blockchain.addBlock(newBlock)) {
+            this.blockchain.pendingTransactions = [
+              rewardTx,
+            ];
+            this.broadcastBlock.next({ block: newBlock, sender: this, rewardTx, referrer: this });
+            this.eventEmitter.next({ msg: SystemNode.events.BROADCAST_BLOCK, referrer: this });
+            this.isMining = false;
+            if (callback) {
+              callback();
+            }
+          }
+        }, this.remainingMiningDelay);
+      } else {
         this.isMining = false;
-        if (callback) {
-          callback();
-        }
-      }, this.remainingMiningDelay);
+      }
     });
   }
 

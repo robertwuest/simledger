@@ -12,6 +12,7 @@
         <img class="sml-graph-viewer__node-process" src="../assets/icons/gears.svg" alt="" fill="#FF0000"/>
         <img class="sml-graph-viewer__node-pow-lottery" :src="`/img/icons/die${ node.systemNode.miningDelay + 1 }.svg`" alt=""/>
         <div class="sml-graph-viewer__node-progress-bar"><span v-bind:style="{ width: `${ node.systemNode.getRemainingMiningDelayPercentage() }%` }"></span></div>
+        <img class="sml-graph-viewer__node-error" :src="`/img/icons/error.svg`" alt=""/>
       </div>
     </div>
   </div>
@@ -210,6 +211,38 @@ export default class GraphViewer extends Vue {
         bottom: 5px;
         right: 5px;
         display: none;
+      }
+
+      &.error {
+        .sml-graph-viewer__node-error {
+          display: block;
+        }
+      }
+
+      &-error {
+        pointer-events: none;
+        animation-duration: 2s;
+        animation-name: flash;
+        opacity: 0;
+        display: none;
+
+        &.show {
+          display: block;
+        }
+      }
+
+      @keyframes flash {
+        0% {
+          opacity: 0;
+        }
+
+        40% {
+          opacity: 1;
+        }
+
+        100% {
+          opacity: 0;
+        }
       }
 
       &-progress-bar {

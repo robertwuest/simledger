@@ -15,6 +15,7 @@
         </pane>
         <pane>
           <div class="sml-dashboard__heading">Editor</div>
+          <NodeEditor ref="nodeEditor" :nodes="nodes" :selectedNodeId="selectedNodeId"></NodeEditor>
         </pane>
       </splitpanes>
     </pane>
@@ -32,6 +33,7 @@ import { Splitpanes, Pane } from 'splitpanes';
 import 'splitpanes/dist/splitpanes.css';
 import GraphViewer from './GraphViewer.vue';
 import NodeExplorer from './NodeExplorer.vue';
+import NodeEditor from './NodeEditor.vue';
 import { SystemNode } from '../network/system_node';
 import SmlCommon from '../common';
 import { System } from '../network/system';
@@ -42,6 +44,7 @@ Vue.component('v-select', vSelect);
 @Component({
   components: {
     NodeExplorer,
+    NodeEditor,
     GraphViewer,
     Splitpanes,
     Pane,
@@ -65,11 +68,13 @@ export default class Dashboard extends Vue {
   selectedNodeId = '';
   graphViewer!: GraphViewer;
   nodeExplorer!: NodeExplorer;
+  nodeEditor!: NodeEditor;
   system!: System;
 
   mounted() {
     this.graphViewer = this.$refs.graphViewer as GraphViewer;
     this.nodeExplorer = this.$refs.nodeExplorer as NodeExplorer;
+    this.nodeEditor = this.$refs.nodeEditor as NodeEditor;
 
     // Genesis account from private key -- (!) hardcoded private key
     const genesisAcc = SmlCommon.generateKeyPair('9QpiFVXv6HNP47u2ZYGQ5anz9GigfM4JxLbvyYCfd9W');
@@ -85,28 +90,9 @@ export default class Dashboard extends Vue {
     this.connectNodes(bobNode, aliceNode);
     this.connectNodes(aliceNode, frankNode);
     this.connectNodes(frankNode, graceNode);
+    this.connectNodes(aliceNode, graceNode);
 
-    /* eslint-disable */
-    setTimeout(() => {
-      // transfer initial coins from genesis addres to bob to start the blockchain
-
-
-      // bob mines the transactions including his own
-      bobNode.systemNode.startMining(() => {
-        setTimeout(() => {
-          this.orderTransaction(SmlCommon.HexToBase58(genesisAcc.getPublic(true, 'hex')), bobNode.systemNode.address, 100.0, genesisAcc, bobNode);
-          setTimeout(() => {
-            frankNode.systemNode.startMining(() => {
-              this.orderTransaction(bobNode.systemNode.address, frankNode.systemNode.address, 50.0, bobNode.systemNode.keyPair, graceNode);
-              setTimeout(() => {
-                aliceNode.systemNode.startMining();
-              }, 10000);
-            });
-          }, 10000);
-        },10000);
-      });
-    }, 1000);
-    /* eslint-enable */
+    this.orderTransaction(SmlCommon.HexToBase58(genesisAcc.getPublic(true, 'hex')), bobNode.systemNode.address, 100, genesisAcc, bobNode);
   }
 
   /**
@@ -183,6 +169,12 @@ export default class Dashboard extends Vue {
             (edge.source.id !== event.referrer.id && edge.target.id !== event.referrer.id)) {
             this.graphViewer.animateBroadcast('<img src="img/icons/block.svg" alt="" />', 'sml-graph-viewer__blockdiv', sender.graphRef.id, edge);
           }
+        }
+        if (event.msg === SystemNode.events.MESSAGE && event.payload.type === 'warn') {
+          sender.element.classList.toggle('error', true);
+          setTimeout(() => {
+            sender.element.classList.toggle('error', false);
+          }, 2000);
         }
       });
     }

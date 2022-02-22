@@ -8,6 +8,23 @@ body {
 
 input {
   color: var(--text-color);
+  background: var(--background-2-color);
+  border: none;
+  height: 20px;
+  padding: 5px;
+}
+
+button {
+  padding: 8px;
+  font-weight: bold;
+  color: var(--text-color);
+  border: 2px solid var(--frame-border);
+  border-radius: 6px;
+  background: var(--background-2-color);
+
+  &:hover {
+    background: var(--background-color);
+  }
 }
 
 // vue-select class overrides

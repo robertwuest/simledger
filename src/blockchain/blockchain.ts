@@ -1,5 +1,5 @@
 import SmlCommon from '../common';
-import { Transaction } from './transaction';
+import { Transaction } from './transaction'; // eslint-disable-line
 import { Block } from './block'; // eslint-disable-line
 
 /**
@@ -12,6 +12,7 @@ export class Blockchain {
   pendingTransactions: Transaction[];
   miningReward: number;
   genesisAddress: string;
+  logSubscribers: any[] = [];
 
   constructor() {
     // assume a value for difficulty - when using simulated delay it should be set 1
@@ -25,7 +26,7 @@ export class Blockchain {
     // setup the chain with a genesis block
     this.chain = [this.createGenesisBlock()];
     // reward initial genesis account
-    this.addTransaction(new Transaction('_', this.genesisAddress, this.miningReward));
+    // this.addTransaction(new Transaction('_', this.genesisAddress, this.miningReward));
   }
 
   /**
@@ -47,20 +48,18 @@ export class Blockchain {
    */
   minePendingTransactions(miningRewardAddress: string, callback?: (newBlock: any, rewardTx: any) => void) {
     const block = new Block(this.chain.length + 1, SmlCommon.generateTimestamp(), this.pendingTransactions, miningRewardAddress, this.getLatestBlock().rewardAddress, this.getLatestBlock().hash);
-    const callB = (newBlock: any) => {
-      // Add the newly mined block to the chain
-      if (this.addBlock(newBlock)) {
+    if (Block.hasValidTransactions(block, this)) {
+      const callB = (newBlock: any) => {
         const rewardTx = new Transaction('_', miningRewardAddress, this.miningReward);
-        // Reset the pending transactions and send the mining reward
-        this.pendingTransactions = [
-          rewardTx,
-        ];
+
         if (callback) {
           callback(newBlock, rewardTx);
         }
-      }
-    };
-    Block.mineBlock(block, this.difficulty, callB);
+      };
+      Block.mineBlock(block, this.difficulty, callB);
+    } else {
+      callback(null, null);
+    }
   }
 
   /**
@@ -118,27 +117,27 @@ export class Blockchain {
    */
   addBlock(block: Block) {
     if (block.hash === this.getLatestBlock().hash) {
-      console.log('%cBC: Block already known', 'color: #0FF');
+      this.log('log', '%cBC: Block already known', 'color: #0FF');
       return false;
     }
     if (block.length !== this.getBlockchainLength() + 1) {
-      console.warn('%cBC: Block denotes invalid chain length', 'color: #0FF');
+      this.log('warn', '%cBC: Block denotes invalid chain length', 'color: #0FF');
       return false;
     }
     if (block.hash !== Block.generateHash(block)) {
-      console.warn('%cBC: Block hash invalid');
+      this.log('warn', '%cBC: Block hash invalid');
       return false;
     }
     if (block.previousHash !== this.getLatestBlock().hash) {
-      console.warn('%cBC: Block has invalid previous hash', 'color: #0FF');
+      this.log('warn', '%cBC: Block has invalid previous hash', 'color: #0FF');
       return false;
     }
     if (!Block.hasValidTransactions(block, this)) {
-      console.warn('%cBC: Block has invalid transactions', 'color: #0FF');
+      this.log('warn', '%cBC: Block has invalid transactions', 'color: #0FF');
       return false;
     }
     if (!block.hash.substring(0, this.difficulty).split('').every(val => val === '0')) {
-      console.warn('%cBC: Block hash doesnt meet difficulty', 'color: #0FF');
+      this.log('warn', '%cBC: Block hash doesnt meet difficulty', 'color: #0FF');
       return false;
     }
     // add valid block to chain
@@ -163,28 +162,28 @@ export class Blockchain {
       // Recalculate the hash of the block and see if it matches up.
       // This allows us to detect changes to a single block
       if (currentBlock.hash !== Block.generateHash(currentBlock)) {
-        console.warn(`%c Chain invalid: Invalid hash at block length: ${currentBlock.length}`, 'background: #44FF44; color: #000');
+        this.log('warn', `%c Chain invalid: Invalid hash at block length: ${currentBlock.length}`, 'background: #44FF44; color: #000');
         return false;
       }
 
       // Check if this block actually points to the previous block (hash)
       if (currentBlock.previousHash !== previousBlock.hash) {
-        console.warn(`%c Chain invalid: Invalid previous hash at block length: ${currentBlock.length}`, 'background: #44FF44; color: #000');
+        this.log('warn', `%c Chain invalid: Invalid previous hash at block length: ${currentBlock.length}`, 'background: #44FF44; color: #000');
         return false;
       }
 
       if (!Block.hasValidTransactions(currentBlock, this)) {
-        console.warn(`%c Chain invalid: Invalid transactions at block length: ${currentBlock.length}`, 'background: #44FF44; color: #000');
+        this.log('warn', `%c Chain invalid: Invalid transactions at block length: ${currentBlock.length}`, 'background: #44FF44; color: #000');
         return false;
       }
     }
     // Check the genesis block
     if (this.chain[0].hash !== Block.generateHash(this.createGenesisBlock())) {
-      console.warn('%c Chain invalid: Genesis block invalid', 'background: #44FF44; color: #000');
+      this.log('warn', '%c Chain invalid: Genesis block invalid', 'background: #44FF44; color: #000');
       return false;
     }
     // If we managed to get here, the chain is valid!
-    console.log('%c Chain is valid!', 'background: #00EE00; color: #000');
+    this.log('log', '%c Chain is valid!', 'background: #00EE00; color: #000');
     return true;
   }
 
@@ -194,41 +193,68 @@ export class Blockchain {
   addTransaction(transaction: Transaction) {
     if (!transaction.fromAddress || !transaction.toAddress) {
       console.log(transaction);
-      console.warn('%cTX: Transaction must include from and to address', 'color: #FF0');
+      this.log('warn', '%cTX: Transaction must include from and to address', 'color: #FF0');
       return false;
     }
 
-    if (!Transaction.isValid(transaction)) {
+    if (!Transaction.isValid(transaction, this)) {
       console.log(transaction);
-      console.warn('%cTX: Cannot add invalid transaction to chain', 'color: #FF0');
+      this.log('warn', '%cTX: Cannot add invalid transaction to chain', 'color: #FF0');
       return false;
     }
 
     if (transaction.fromAddress !== '_' && this.getBalanceOfAddress(transaction.fromAddress) - transaction.amount < 0.0) {
       console.log(transaction);
-      console.warn('%cTX: Transaction overspend from sender', 'color: #FF0');
+      this.log('warn', '%cTX: Transaction overspend from sender', 'color: #FF0');
       return false;
     }
 
     if (transaction.fromAddress === '_') {
       if (transaction.amount !== this.miningReward) {
         console.log(transaction);
-        console.warn('%cTX: Invalid reward', 'color: #FF0');
+        this.log('warn', '%cTX: Invalid reward', 'color: #FF0');
         return false;
       }
       if (this.pendingTransactions.find(tx => tx.fromAddress)) {
         console.log(transaction);
-        console.warn('%cTX: Duplicated reward transaction', 'color: #FF0');
+        this.log('warn', '%cTX: Duplicated reward transaction', 'color: #FF0');
         return false;
       }
     }
 
     if (this.pendingTransactions.find(tx => Transaction.generateHash(transaction) === Transaction.generateHash(tx))) {
-      console.log('%cTX: Transaction already known, do nothing', 'color: #FF0');
+      this.log('log', '%cTX: Transaction already known, do nothing', 'color: #FF0');
       return false;
     }
 
     this.pendingTransactions.push(transaction);
     return true;
+  }
+
+  registerLogSubscriber(callback: Function) {
+    this.logSubscribers.push(callback);
+  }
+
+  log(type, message, params?) {
+    switch (type) {
+      case 'warn':
+        console.warn(message, params);
+        this.notifyLogSubscribers('warn', message);
+        break;
+      case 'error':
+        console.error(message, params);
+        this.notifyLogSubscribers('error', message);
+        break;
+      default:
+        console.log(message, params);
+        this.notifyLogSubscribers('log', message);
+        break;
+    }
+  }
+
+  notifyLogSubscribers(type, message) {
+    this.logSubscribers.forEach((subscriber) => {
+      subscriber(type, message);
+    });
   }
 }
