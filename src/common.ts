@@ -67,4 +67,17 @@ export default class SmlCommon {
     }
     return rand;
   }
+
+  /**
+   * Generate a random nonce
+   */
+  public static generateNonce() {
+    const length = 4;
+    let text = '';
+    const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    for (let i = 0; i < length; i++) {
+      text += possible.charAt(Math.floor(Math.random() * possible.length));
+    }
+    return text;
+  }
 }

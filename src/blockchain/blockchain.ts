@@ -25,8 +25,6 @@ export class Blockchain {
     this.genesisAddress = 'eb2WnqvmsejmUgxs7EkcUGEAzbxrTjhmH3nTMUJuUA3g';
     // setup the chain with a genesis block
     this.chain = [this.createGenesisBlock()];
-    // reward initial genesis account
-    // this.addTransaction(new Transaction('_', this.genesisAddress, this.miningReward));
   }
 
   /**
@@ -36,7 +34,7 @@ export class Blockchain {
     return new Block(
       1,
       '0',
-      [new Transaction('_', this.genesisAddress, 100.0)],
+      [new Transaction('_', this.genesisAddress, 100.0, 'ABBA')],
       this.genesisAddress,
       'genesisRewardAddress',
       'genesisHash',
@@ -197,13 +195,26 @@ export class Blockchain {
       return false;
     }
 
+    if (this.pendingTransactions.find(tx => Transaction.generateHash(transaction) === Transaction.generateHash(tx))) {
+      this.log('log', '%cTX: Transaction already known, do nothing', 'color: #FF0');
+      return false;
+    }
+
     if (!Transaction.isValid(transaction, this)) {
       console.log(transaction);
       this.log('warn', '%cTX: Cannot add invalid transaction to chain', 'color: #FF0');
       return false;
     }
 
-    if (transaction.fromAddress !== '_' && this.getBalanceOfAddress(transaction.fromAddress) - transaction.amount < 0.0) {
+    // Dont add transaction that would overspend
+    let pendingAmount = this.getBalanceOfAddress(transaction.fromAddress);
+    const pendingTransactions = this.pendingTransactions
+      .filter(tx => tx.fromAddress === transaction.fromAddress);
+    if (pendingTransactions.length > 0) {
+      pendingAmount -= pendingTransactions.map(tx => tx.amount).reduce((total, add) => total + add);
+    }
+
+    if (transaction.fromAddress !== '_' && pendingAmount - transaction.amount < 0.0) {
       console.log(transaction);
       this.log('warn', '%cTX: Transaction overspend from sender', 'color: #FF0');
       return false;
@@ -220,11 +231,6 @@ export class Blockchain {
         this.log('warn', '%cTX: Duplicated reward transaction', 'color: #FF0');
         return false;
       }
-    }
-
-    if (this.pendingTransactions.find(tx => Transaction.generateHash(transaction) === Transaction.generateHash(tx))) {
-      this.log('log', '%cTX: Transaction already known, do nothing', 'color: #FF0');
-      return false;
     }
 
     this.pendingTransactions.push(transaction);

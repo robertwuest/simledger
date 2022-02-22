@@ -96,13 +96,15 @@ export class Block {
         // signature check failed
         return false;
       }
+      // prevent over spending
       if (!balances.get(tx.fromAddress)) {
-        balances.set(tx.fromAddress, blockchain.getBalanceOfAddress(tx.fromAddress, self.length - 2));
+        balances.set(tx.fromAddress, blockchain.getBalanceOfAddress(tx.fromAddress));
       }
       if (balances.get(tx.fromAddress) - tx.amount < 0.0) {
         blockchain.log('warn', `%cBlock: Overspend from address: ${tx.fromAddress}`, 'color: #F0F');
         return false;
       }
+      balances.set(tx.fromAddress, balances.get(tx.fromAddress) - tx.amount);
     }
     if (!hasRewardTransaction && blockchain.getLatestBlock().previousHash !== 'genesisHash') {
       blockchain.log('warn', '%cBlock: No reward transaction found', 'color: #F0F');

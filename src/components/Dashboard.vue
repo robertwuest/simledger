@@ -9,7 +9,7 @@
     </pane>
     <pane>
       <splitpanes class="default-theme" horizontal>
-        <pane>
+        <pane class="sml-dashboard__container">
           <div class="sml-dashboard__heading">Explorer</div>
           <NodeExplorer ref="nodeExplorer" :nodes="nodes" @node-changed="onExplorerNodeChanged"></NodeExplorer>
         </pane>
@@ -87,6 +87,8 @@ export default class Dashboard extends Vue {
     const aliceNode = this.addNode('Alice');
     const frankNode = this.addNode('Frank');
     const graceNode = this.addNode('Grace');
+    const daveNode = this.addNode('Dave');
+
     this.connectNodes(bobNode, aliceNode);
     this.connectNodes(aliceNode, frankNode);
     this.connectNodes(frankNode, graceNode);
@@ -224,6 +226,9 @@ export default class Dashboard extends Vue {
       font-weight: bold;
       text-align: left;
       padding: 2px 5px;
+    }
+    &__container {
+      overflow-y: auto;
     }
   }
 

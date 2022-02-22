@@ -143,9 +143,6 @@ export default class NodeExplorer extends Vue {
       }
     }
 
-    &__pending {
-      max-height: 80px;
-    }
     &__chain {
       display: block;
 
