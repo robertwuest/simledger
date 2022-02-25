@@ -25,6 +25,7 @@ export class Blockchain {
     this.genesisAddress = 'eb2WnqvmsejmUgxs7EkcUGEAzbxrTjhmH3nTMUJuUA3g';
     // setup the chain with a genesis block
     this.chain = [this.createGenesisBlock()];
+    this.addTransaction(new Transaction('_', this.genesisAddress, this.miningReward));
   }
 
   /**
@@ -83,6 +84,16 @@ export class Blockchain {
       }
     }
     return balance;
+  }
+
+  /**
+   * Truncate the change
+   * @param index
+   */
+  truncateChain(index) {
+    if (index < this.getBlockchainLength()) {
+      this.chain.splice(index);
+    }
   }
 
   /**

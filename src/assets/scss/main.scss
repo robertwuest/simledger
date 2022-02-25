@@ -34,6 +34,8 @@ button {
 .vs__selected,
 .vs__dropdown-option {
   color: var(--text-color);
+  margin: 0;
+  line-height: 1;
 }
 
 .vs__search::placeholder {

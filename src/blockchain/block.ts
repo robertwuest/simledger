@@ -97,8 +97,8 @@ export class Block {
         return false;
       }
       // prevent over spending
-      if (!balances.get(tx.fromAddress)) {
-        balances.set(tx.fromAddress, blockchain.getBalanceOfAddress(tx.fromAddress));
+      if (!balances.has(tx.fromAddress)) {
+        balances.set(tx.fromAddress, blockchain.getBalanceOfAddress(tx.fromAddress, self.length - 2));
       }
       if (balances.get(tx.fromAddress) - tx.amount < 0.0) {
         blockchain.log('warn', `%cBlock: Overspend from address: ${tx.fromAddress}`, 'color: #F0F');

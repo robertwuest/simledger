@@ -171,42 +171,51 @@ export class SystemNode {
   private onNewBlock(bcBlock: any) {
     if (bcBlock) {
       console.log('New block');
+      let chainValid;
+      let broadCastBlock = true;
       const { block, sender, rewardTx } = bcBlock;
       if (!this.blockchain.addBlock(block)) {
         console.log('Adding new block failed');
-
         let divertingChain = false;
+        broadCastBlock = false;
         if (this.blockchain.getBlockchainLength() < sender.blockchain.getBlockchainLength()) {
+          broadCastBlock = true;
           for (let i = 0; i < sender.blockchain.getBlockchainLength(); i++) {
             if (i >= this.blockchain.getBlockchainLength()) {
               if (!this.blockchain.addBlock(sender.getBlock(i))) {
                 console.log('Synchronization failed 0');
+                chainValid = false;
                 break;
               }
               continue;
             }
             if (divertingChain || this.getBlock(i).hash !== sender.getBlock(i).hash) {
               divertingChain = true;
+              this.blockchain.truncateChain(i);
               if (!this.blockchain.addBlock(sender.getBlock(i))) {
                 console.log('Synchronization failed 1');
+                chainValid = false;
                 break;
               }
             }
           }
-          const exisitingTransactions = this.blockchain.pendingTransactions.filter(tx => tx.fromAddress !== '_');
-          this.blockchain.pendingTransactions = sender.blockchain.pendingTransactions.concat(exisitingTransactions);
-          exisitingTransactions.forEach((tx) => {
-            this.pushToTickQueue(() => {
-              this.broadcastTransaction.next({ tx, sender: this, referrer: this });
-              this.eventEmitter.next({ msg: SystemNode.events.BROADCAST_TX, referrer: this });
-            });
-          });
         }
-      } else {
-        this.blockchain.addTransaction(rewardTx);
+      }
+      console.log(this.id, 'Check if chain valid');
+      chainValid = this.blockchain.isChainValid();
+      if (chainValid && broadCastBlock) {
         this.pushToTickQueue(() => {
           this.broadcastBlock.next({ block, sender: this, rewardTx, referrer: sender });
           this.eventEmitter.next({ msg: SystemNode.events.BROADCAST_BLOCK, referrer: sender });
+        });
+        const exisitingTransactions = this.blockchain.pendingTransactions.filter(tx => tx.fromAddress !== '_');
+        this.blockchain.pendingTransactions = sender.blockchain.pendingTransactions.concat(exisitingTransactions);
+        this.blockchain.addTransaction(rewardTx);
+        exisitingTransactions.forEach((tx) => {
+          this.pushToTickQueue(() => {
+            this.broadcastTransaction.next({ tx, sender: this, referrer: this });
+            this.eventEmitter.next({ msg: SystemNode.events.BROADCAST_TX, referrer: this });
+          });
         });
       }
     }

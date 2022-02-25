@@ -3,14 +3,15 @@
     <div class="sml-node-editor">
       <div class="sml-node-editor__control" v-if="selectedNode"><h4>Add Transaction</h4>
         <div class="sml-node-editor__tx">
-          From: <v-select label="id" v-model="fromNode" :options="getNodes" :clearable="false"></v-select>
-          To: <v-select label="id" v-model="toNode" :options="getNodes" :clearable="false"></v-select>
-          Amount: <input type="number" v-model="txAmount" />
+          <div class="tx__connect">From: <v-select label="id" v-model="fromNode" :options="getNodes" :clearable="false"></v-select>
+            To: <v-select label="id" v-model="toNode" :options="getNodes" :clearable="false"></v-select></div>
+          <div class="tx__amount">Amount:<input type="number" v-model="txAmount" /></div>
         </div>
         <button v-on:click="orderTransaction()">Add Transaction</button>
       </div>
       <div class="sml-node-editor__control" v-if="selectedNode"><h4>Controls</h4>
         <button v-on:click="minePendingTransactions()">Mine New Block</button>
+        <button v-on:click="validateChain()">Validate current chain</button>
       </div>
     </div>
   </div>
@@ -71,6 +72,11 @@ export default class NodeEditor extends Vue {
   minePendingTransactions() {
     this.selectedNode.systemNode.startMining();
   }
+
+  validateChain() {
+    console.log(this.selectedNode.systemNode.blockchain);
+    this.selectedNode.systemNode.blockchain.isChainValid();
+  }
 }
 </script>
 
@@ -88,11 +94,32 @@ export default class NodeEditor extends Vue {
 
     &__tx {
       display: flex;
-      align-items: center;
-      margin-bottom: 8px;
+      flex-wrap: wrap;
 
-      .v-select {
+      .tx__connect,
+      .tx__amount {
+        display: flex;
         flex-grow: 1;
+        align-items: center;
+        margin-bottom: 8px;
+        justify-content: stretch;
+      }
+
+      .tx__amount {
+        width: 30%;
+
+        input[type="number"] {
+          width: 100%;
+          margin-left: 8px;
+        }
+      }
+
+      .tx__connect {
+        .v-select {
+          flex-grow: 1;
+          min-width: 160px;
+          margin: 0 8px;
+        }
       }
     }
 
@@ -102,6 +129,11 @@ export default class NodeEditor extends Vue {
       border: 1px solid var(--frame-border);
       display: flex;
       flex-direction: column;
+
+      button {
+        margin-bottom: 5px;
+        cursor: pointer;
+      }
     }
   }
 </style>
