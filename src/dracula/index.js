@@ -7,24 +7,24 @@
 /* eslint-disable */
 
 // Core
-const dracula = require('./dracula').default;
+import dracula from './dracula';
 
 // Layouts
-const spring = require('./layout/spring').default;
-const orderedTree = require('./layout/ordered_tree').default;
-const tournamentTree = require('./layout/tournament_tree').default;
+import spring from './layout/spring';
+import orderedTree from './layout/ordered_tree';
+import tournamentTree from './layout/tournament_tree';
 
 // Renderers
-const raphael = require('./renderer/raphael').default;
+import raphael from './renderer/raphael';
 
-module.exports.Graph = dracula;
+export const Graph = dracula;
 
-module.exports.Layout = {
+export const Layout = {
   OrderedTree: orderedTree,
   Spring: spring,
   TournamentTree: tournamentTree,
 };
 
-module.exports.Renderer = {
+export const Renderer = {
   Raphael: raphael,
 };

@@ -6,7 +6,7 @@
  */
 /* eslint-disable */
 import ImportedRaphael from 'raphael';
-import Renderer from './renderer';
+import Renderer from './renderer.js';
 
 // Is not bundled for the standalone browser version (e.g. for CDN)
 const Raphael = typeof window !== 'undefined' && window.Raphael || ImportedRaphael

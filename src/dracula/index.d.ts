@@ -1,6 +1,3 @@
-declare const Dracula: {
-  Graph: any,
-  Layout: any,
-  Renderer: any,
-};
-export default Dracula;
+export const Graph: any;
+export const Layout: any;
+export const Renderer: any;

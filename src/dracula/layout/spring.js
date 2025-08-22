@@ -5,8 +5,8 @@
  https://github.com/strathausen/dracula
  */
 /* eslint-disable */
-import { each } from 'lodash/collection'
-import Layout from './layout'
+import forEach from 'lodash/forEach.js';
+import Layout from './layout.js'
 
 /**
  * TODO take ratio into account
@@ -36,7 +36,7 @@ export default class Spring extends Layout {
   }
 
   layoutPrepare() {
-    each(this.graph.nodes, (node) => {
+    forEach(this.graph.nodes, (node) => {
       node.layoutPosX = 0
       node.layoutPosY = 0
       node.layoutForceX = 0
@@ -47,20 +47,19 @@ export default class Spring extends Layout {
   layoutIteration() {
     // Forces on nodes due to node-node repulsions
     const prev = []
-    each(this.graph.nodes, (node1) => {
+    forEach(this.graph.nodes, (node1) => {
       prev.forEach((node2) => {
         this.layoutRepulsive(node1, node2)
       })
       prev.push(node1)
     })
-
     // Forces on nodes due to edge attractions
     this.graph.edges.forEach((edge) => {
       this.layoutAttractive(edge)
     })
 
     // Move by the given force
-    each(this.graph.nodes, (node) => {
+    forEach(this.graph.nodes, (node) => {
       let xmove = this.c * node.layoutForceX
       let ymove = this.c * node.layoutForceY
 

@@ -1,7 +1,7 @@
 import { BehaviorSubject, Subject } from 'rxjs';
 import { Block } from '../blockchain/block';
 import { System } from './system';
-import { Tick } from './tick';
+import type { Tick } from './tick';
 import { Transaction } from '../blockchain/transaction';
 import { Blockchain } from '../blockchain/blockchain';
 import SmlCommon from '../common';

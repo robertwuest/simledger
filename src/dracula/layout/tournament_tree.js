@@ -5,8 +5,8 @@
  https://github.com/strathausen/dracula
  */
 /* eslint-disable */
-import { each } from 'lodash/collection'
-import Layout from './layout'
+import forEach from 'lodash/forEach.js';
+import Layout from './layout.js'
 
 export default class TournamentTree extends Layout {
   /**
@@ -26,7 +26,7 @@ export default class TournamentTree extends Layout {
   }
 
   layoutPrepare() {
-    each(this.graph.nodes, (node) => {
+    forEach(this.graph.nodes, (node) => {
       node.layoutPosX = 0
       node.layoutPosY = 0
     })

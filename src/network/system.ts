@@ -1,5 +1,5 @@
 import { BehaviorSubject } from 'rxjs';
-import { Tick } from './tick';
+import type { Tick } from './tick';
 
 export class System {
   public static CycleTime = 2000;

@@ -31,9 +31,30 @@ export default class SmlCommon {
    * @constructor
    */
   public static HexToBase58(key: any) {
-    const bytes = Buffer.from(key, 'hex');
+    const bytes = SmlCommon.BufferFromHex(key);
     return base58.encode(bytes);
   }
+
+
+  public static BufferFromHex(hexString: string) {
+      if (typeof hexString !== 'string') {
+        throw new TypeError('Expected input to be a hex string');
+      }
+      if (hexString.length % 2 !== 0) {
+        throw new RangeError('Hex string must have an even length');
+      }
+
+      const length = hexString.length / 2;
+      const result = new Uint8Array(length);
+
+      for (let i = 0; i < length; i++) {
+        const byte = hexString.substr(i * 2, 2);
+        result[i] = parseInt(byte, 16);
+      }
+
+      return result;
+  }
+
 
   /**
    * Convert a Base58 hash string back to hex
@@ -42,7 +63,13 @@ export default class SmlCommon {
    */
   public static Base58ToHex(key: any) {
     const bytes = base58.decode(key);
-    return bytes.toString('hex');
+    return SmlCommon.Uint8ArrayToHex(bytes);
+  }
+
+  public static Uint8ArrayToHex(bytes: Uint8Array): string {
+    return Array.from(bytes)
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
   }
 
   /**

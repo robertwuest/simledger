@@ -5,7 +5,7 @@
  https://github.com/strathausen/dracula
  */
 /* eslint-disable */
-import Layout from './layout'
+import Layout from './layout.js'
 
 /**
  * OrderedTree is like Ordered but assumes there is one root

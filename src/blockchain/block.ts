@@ -53,8 +53,18 @@ export class Block {
    */
   static mineBlock(self: Block, difficulty: number, callback: any) {
     const worker = new Worker('js/mining.js');
+    // Only send serializable data
     worker.postMessage({
-      block: self,
+      block: {
+        previousHash: self.previousHash,
+        length: self.length,
+        timestamp: self.timestamp,
+        transactions: self.transactions.map(tx => ({ ...tx })),
+        rewardAddress: self.rewardAddress,
+        previousRewardAddress: self.previousRewardAddress,
+        nonce: self.nonce,
+        hash: self.hash
+      },
       difficulty,
     });
     worker.addEventListener('message', (e) => {
