@@ -9,9 +9,11 @@ import SnapSvg from 'snapsvg'
 import Renderer from './renderer'
 
 export default class RaphaelRenderer extends Renderer {
+  canvas: any
+  lineStyle: { stroke: string; 'stroke-width': string }
   constructor(element, graph, width, height) {
     super(element, graph, width, height)
-    this.canvas = new SnapSvg(this.width, this.height, element)
+    this.canvas = SnapSvg(element)
     this.lineStyle = {
       stroke: '#abcdef',
       'stroke-width': '2px',

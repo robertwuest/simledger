@@ -35,14 +35,12 @@ function onDashboardReady() {
 
 <style>
 @import '~~/assets/css/main.css';
-@import '~~/node_modules/splitpanes/dist/splitpanes.css';
 #__nuxt {
-	 font-family: Avenir, Helvetica, Arial, sans-serif;
-	 -webkit-font-smoothing: antialiased;
-	 -moz-osx-font-smoothing: grayscale;
+
 	 text-align: center;
-	 color: var(--text-color);
-	 background: var(--background-color);
+   background-color: var(--ui-bg-muted);
+   display: flex;
+   height: 100vh;
 }
  #nav {
 	 padding: 30px;

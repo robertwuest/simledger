@@ -9,23 +9,24 @@ import forEach from 'lodash/forEach.js';
 import Layout from './layout.js'
 
 export default class TournamentTree extends Layout {
+  order: any[];
   /**
    * @param {Graph} graph
    * @param {Array[Node]} order
    */
-  constructor(graph, order) {
-    super()
+  constructor(graph: any, order: any[]) {
+    super(graph)
     this.graph = graph
     this.order = order
     this.layout()
   }
 
-  layout() {
+  override layout() {
     this.layoutPrepare()
     this.layoutCalcBounds()
   }
 
-  layoutPrepare() {
+  override layoutPrepare() {
     forEach(this.graph.nodes, (node) => {
       node.layoutPosX = 0
       node.layoutPosY = 0

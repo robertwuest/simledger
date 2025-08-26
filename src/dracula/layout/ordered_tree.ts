@@ -13,6 +13,7 @@ import Layout from './layout.js'
  * It assumes the ordered nodes are of a perfect binary tree
  */
 export default class OrderedTree extends Layout {
+  order: any
   constructor(graph, order) {
     super(graph)
     this.order = order

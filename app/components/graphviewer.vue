@@ -308,10 +308,10 @@ defineExpose({
     display: none;
     position: absolute;
     border: 1px solid var(--frame-border);
-    background-color: var(--background-color);
-    border-radius: 4px;
-    right: 0;
-    bottom: 100%;
+    background-color: var(--ui-bg);
+    border-radius: 6px;
+    right: -4px;
+    bottom: calc(100% + 8px);
   }
   .sml-graph-viewer__node-connector .c-menu-item {
     display: flex;

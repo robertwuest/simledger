@@ -2,20 +2,20 @@
 
 <template>
   <div class="sml-dashboard">
-  <splitpanes class="default-theme" vertical style="height: calc(100vh - 167px)"
+  <splitpanes class="default-theme" horizontal
               @resize="resizePane($event)"
               @resized="paneResized($event)">
-    <pane size="65">
+    <pane size="65" class="sml-dashboard__container">
         <div class="sml-dashboard__heading">Graph Viewer</div>
         <GraphViewer ref="graphViewer" :selectedNodeId="selectedNodeId" :nodes="nodes" @node-clicked="onGraphNodeClicked"  @graph-ready="onGraphReady"></GraphViewer>
     </pane>
     <pane>
-      <splitpanes class="default-theme" horizontal>
+      <splitpanes class="default-theme" vertical>
         <pane class="sml-dashboard__container">
           <div class="sml-dashboard__heading">Explorer</div>
           <NodeExplorer ref="nodeExplorer" :nodes="nodes" @node-changed="onExplorerNodeChanged"></NodeExplorer>
         </pane>
-        <pane>
+        <pane class="sml-dashboard__container">
           <div class="sml-dashboard__heading">Editor</div>
           <NodeEditor ref="nodeEditor" :nodes="nodes" :selectedNodeId="selectedNodeId"></NodeEditor>
         </pane>
@@ -172,6 +172,7 @@ defineExpose({
 });
 </script>
 <style>
+@import '~~/node_modules/splitpanes/dist/splitpanes.css';
   h3 {
     margin: 40px 0 0;
   }
@@ -183,27 +184,30 @@ defineExpose({
     display: inline-block;
     margin: 0 10px;
   }
-  a {
-    color: #42b983;
+
+  .sml-dashboard {
+    flex-grow: 1;
   }
+
   .sml-dashboard__heading {
-    background: var(--background-2-color);
+    background: var(--ui-bg-elevated);
     font-weight: bold;
     text-align: left;
     padding: 2px 5px;
   }
   .sml-dashboard__container {
-    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
   }
-  .splitpanes.default-theme .splitpanes__pane {
+  .default-theme.splitpanes .splitpanes__pane {
     background-color: transparent;
   }
-  .splitpanes.default-theme.splitpanes--vertical > .splitpanes__splitter, .splitpanes.default-theme.splitpanes--horizontal > .splitpanes__splitter {
-    background-color: var(--link-active-color);
+  .default-theme.splitpanes.default-theme.splitpanes--vertical > .splitpanes__splitter, .default-theme.splitpanes.splitpanes--horizontal > .splitpanes__splitter {
+    background-color: var(--ui-bg-accented);
     border-color: transparent;
   }
-  .splitpanes.default-theme.splitpanes--vertical > .splitpanes__splitter:before, .splitpanes.default-theme.splitpanes--horizontal > .splitpanes__splitter:before, .splitpanes.default-theme.splitpanes--vertical > .splitpanes__splitter:after, .splitpanes.default-theme.splitpanes--horizontal > .splitpanes__splitter:after {
-    background-color: var(--background-2-color);
+  .default-theme.splitpanes.splitpanes--vertical > .splitpanes__splitter:before, .default-theme.splitpanes.splitpanes--horizontal > .splitpanes__splitter:before, .default-theme.splitpanes.splitpanes--vertical > .splitpanes__splitter:after, .default-theme.splitpanes.splitpanes--horizontal > .splitpanes__splitter:after {
+    background-color: var(--ui-bg-muted);
   }
 
 </style>

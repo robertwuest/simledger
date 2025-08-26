@@ -13,6 +13,11 @@ import Layout from './layout.js'
  * TODO use integers for speed
  */
 export default class Spring extends Layout {
+  iterations: number;
+    maxRepulsiveForceDistance: number;
+    k: number;
+    c: number;
+    maxVertexMovement: number;
   constructor(graph) {
     super(graph)
     this.iterations = 500
@@ -23,7 +28,7 @@ export default class Spring extends Layout {
     this.layout()
   }
 
-  static create(...args) {
+  static create(...args: ConstructorParameters<typeof Spring>) {
     return new this(...args)
   }
 
@@ -46,7 +51,7 @@ export default class Spring extends Layout {
 
   layoutIteration() {
     // Forces on nodes due to node-node repulsions
-    const prev = []
+    const prev:any = []
     forEach(this.graph.nodes, (node1) => {
       prev.forEach((node2) => {
         this.layoutRepulsive(node1, node2)
@@ -60,8 +65,8 @@ export default class Spring extends Layout {
 
     // Move by the given force
     forEach(this.graph.nodes, (node) => {
-      let xmove = this.c * node.layoutForceX
-      let ymove = this.c * node.layoutForceY
+      let xmove = this.c * (node.layoutForceX ?? 0)
+      let ymove = this.c * (node.layoutForceY ?? 0)
 
       const max = this.maxVertexMovement
 
@@ -70,8 +75,8 @@ export default class Spring extends Layout {
       if (ymove > max) ymove = max
       if (ymove < -max) ymove = -max
 
-      node.layoutPosX += xmove
-      node.layoutPosY += ymove
+      node.layoutPosX = (node.layoutPosX ?? 0) + xmove
+      node.layoutPosY = (node.layoutPosY ?? 0) + ymove
       node.layoutForceX = 0
       node.layoutForceY = 0
     })

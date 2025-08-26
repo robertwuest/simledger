@@ -8,12 +8,28 @@
 import { v4 as uuid } from 'uuid';
 
 // Testing for string or number data type
-const isId = x => !!~['string', 'number'].indexOf(typeof x);
+const isId = (x: any): x is string | number => !!~['string', 'number'].indexOf(typeof x);
 
 /**
  * Graph Data Structure
  */
+interface Node {
+  id: string | number;
+  shape: any;
+  edges: Edge[];
+  [key: string]: any;
+}
+
+interface Edge {
+  style: any;
+  source: Node;
+  target: Node;
+  [key: string]: any;
+}
+
 export default class Dracula {
+  nodes: { [key: string]: Node; [key: number]: Node };
+  edges: Edge[];
   constructor() {
     this.nodes = {};
     this.edges = [];
@@ -38,7 +54,7 @@ export default class Dracula {
    * @param {object|} nodeData (optional)
    * @returns {Node} the new or existing node
    */
-  addNode(id, nodeData) {
+  addNode(id: any, nodeData?: any): Node {
     // Node initialisation shorthands
     if (!nodeData) {
       nodeData = isId(id) ? { id } : id
@@ -50,7 +66,11 @@ export default class Dracula {
       nodeData.id = uuid()
       // Don't create a new node if it already exists
     } else if (this.nodes[nodeData.id]) {
-      return this.nodes[nodeData.id]
+      const existingNode = this.nodes[nodeData.id];
+      if (!existingNode) {
+        throw new Error(`Node with id ${nodeData.id} not found`);
+      }
+      return existingNode;
     }
     nodeData.edges = []
     this.nodes[nodeData.id] = nodeData
@@ -63,7 +83,7 @@ export default class Dracula {
    * @param {object|} (optional) edge data, e.g. styles
    * @returns {Edge}
    */
-  addEdge(sourceNode, targetNode, opts = {}) {
+  addEdge(sourceNode: string | number | object, targetNode: string | number | object, opts: any = {}) {
     const source = this.addNode(sourceNode)
     const target = this.addNode(targetNode)
     const style = opts.style || opts
@@ -78,7 +98,7 @@ export default class Dracula {
    * @param {string|number|Node} node node or ID
    * @return {Node}
    */
-  removeNode(node) {
+  removeNode(node: Node | string | number) {
     const id = isId(node) ? node : node.id;
     node = this.nodes[id];
     // Delete node from index
@@ -86,7 +106,7 @@ export default class Dracula {
     // Delete node from all the edges
     this.edges.forEach((edge) => {
       if (edge.source === node || edge.target === node) {
-        this.removeEdge(edge);
+        this.removeEdge(edge, null);
       }
     });
     node.shape.items.forEach((item) => {

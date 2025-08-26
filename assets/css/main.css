@@ -4,42 +4,12 @@
 body {
 	 margin: 0;
 }
- input {
-	 color: var(--text-color);
-	 background: var(--background-2-color);
-	 border: none;
-	 height: 20px;
-	 padding: 5px;
-}
- button {
-	 padding: 8px;
-	 font-weight: bold;
-	 color: var(--text-color);
-	 border: 2px solid var(--frame-border);
-	 border-radius: 6px;
-	 background: var(--background-2-color);
-}
- button:hover {
-	 background: var(--background-color);
-}
+
  :root {
-	 --background-color: whitesmoke;
-	 --background-2-color: #dbdbdb;
-	 --text-color: #1c2f21;
-	 --link-active-color: #8cc459;
-	 --link-color: #2c3e50;
-	 --frame-border: rgba(28, 47, 33, 0.75);
-	 --shadow-color: #2c3e50;
+
 }
  @media (prefers-color-scheme: dark) {
 	 :root {
-		 --background-color: #1c2f21;
-		 --background-2-color: #2f4934;
-		 --text-color: whitesmoke;
-		 --link-active-color: #8cc459;
-		 --link-color: #cce9c8;
-		 --frame-border: rgba(245, 245, 245, 0.75);
-		 --shadow-color: #8cc459;
 	}
 }
  

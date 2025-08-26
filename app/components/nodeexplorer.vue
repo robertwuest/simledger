@@ -1,34 +1,32 @@
 <template>
-  <div class="sml-node-explorer__container">
-    <div class="sml-node-explorer">
-      <USelect v-model="selectedNodeId" :items="getNodes" class="w-48" placeholder="Select node" />
-      <div v-if="selectedNode" class="sml-node-explorer__ledger">
-        <h4>Ledger</h4>
-        <ul v-for="block in selectedNode.blockchain.chain" :key="block.hash">
-          <li v-for="tx in block.transactions" :key="tx.hash">
-            [{{ tx.amount }}] <span v-html="findAddressId(tx.fromAddress)"></span> &rarr; <span v-html="findAddressId(tx.toAddress)"></span>
-          </li>
-        </ul>
-      </div>
-      <div v-if="selectedNode" class="sml-node-explorer__pending">
-        <h4>Pending Transactions</h4>
+  <div class="sml-node-explorer">
+    <USelect v-model="selectedNodeId" :items="getNodes" class="w-48" placeholder="Select node" />
+    <div v-if="selectedNode" class="sml-node-explorer__ledger">
+      <h4>Ledger</h4>
+      <ul v-for="block in selectedNode.blockchain.chain" :key="block.hash">
+        <li v-for="tx in block.transactions" :key="tx.hash">
+          [{{ tx.amount }}] <span v-html="findAddressId(tx.fromAddress)"></span> &rarr; <span v-html="findAddressId(tx.toAddress)"></span>
+        </li>
+      </ul>
+    </div>
+    <div v-if="selectedNode" class="sml-node-explorer__pending">
+      <h4>Pending Transactions</h4>
+      <ul>
+        <li v-for="tx in selectedNode.blockchain.pendingTransactions" :key="tx.hash">
+          [{{ tx.amount }}] <span v-html="findAddressId(tx.fromAddress)"></span> &rarr; <span v-html="findAddressId(tx.toAddress)"></span>
+        </li>
+      </ul>
+    </div>
+    <div v-if="selectedNode" class="sml-node-explorer__chain">
+      <h4>Chain</h4>
+      <span v-for="block in selectedNode.blockchain.chain" :key="block.length"><span class="sml-node-explorer__chain-block" v-bind:class="{ 'sml-node-explorer__chain-block--selected': selectedBlockIndex === block.length - 1 }" v-on:click="selectedBlockIndex = block.length - 1">Block_{{block.length - 1 > 0 ? block.length - 1: '&#127878;'}}</span> &rarr; </span>
+      <div v-if="selectedNode && selectedBlockIndex >= 0">
+        <h5>Explore: Block_{{selectedBlockIndex}}</h5>
         <ul>
-          <li v-for="tx in selectedNode.blockchain.pendingTransactions" :key="tx.hash">
+          <li v-for="tx in selectedNode.blockchain.chain[selectedBlockIndex].transactions" :key="tx.hash">
             [{{ tx.amount }}] <span v-html="findAddressId(tx.fromAddress)"></span> &rarr; <span v-html="findAddressId(tx.toAddress)"></span>
           </li>
         </ul>
-      </div>
-      <div v-if="selectedNode" class="sml-node-explorer__chain">
-        <h4>Chain</h4>
-        <span v-for="block in selectedNode.blockchain.chain" :key="block.length"><span class="sml-node-explorer__chain-block" v-bind:class="{ 'sml-node-explorer__chain-block--selected': selectedBlockIndex === block.length - 1 }" v-on:click="selectedBlockIndex = block.length - 1">Block_{{block.length - 1 > 0 ? block.length - 1: '&#127878;'}}</span> &rarr; </span>
-        <div v-if="selectedNode && selectedBlockIndex >= 0">
-          <h5>Explore: Block_{{selectedBlockIndex}}</h5>
-          <ul>
-            <li v-for="tx in selectedNode.blockchain.chain[selectedBlockIndex].transactions" :key="tx.hash">
-              [{{ tx.amount }}] <span v-html="findAddressId(tx.fromAddress)"></span> &rarr; <span v-html="findAddressId(tx.toAddress)"></span>
-            </li>
-          </ul>
-        </div>
       </div>
     </div>
   </div>

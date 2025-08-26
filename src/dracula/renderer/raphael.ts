@@ -69,6 +69,8 @@ const dragify = (shape) => {
 }
 
 export default class RaphaelRenderer extends Renderer {
+  canvas: any;
+  lineStyle: { stroke: string; 'stroke-width': string; };
   constructor(element, graph, width, height) {
     super(element, graph, width, height)
     this.canvas = Raphael(this.element, this.width, this.height)
@@ -77,6 +79,15 @@ export default class RaphaelRenderer extends Renderer {
       'stroke-width': '2px',
     }
   }
+    element(element: any, width: any, height: any): any {
+        throw new Error('Method not implemented.');
+    }
+    width(element: any, width: any, height: any): any {
+        throw new Error('Method not implemented.');
+    }
+    height(element: any, width: any, height: any): any {
+        throw new Error('Method not implemented.');
+    }
 
   drawNode(node) {
     const color = Raphael.getColor()
@@ -92,7 +103,7 @@ export default class RaphaelRenderer extends Renderer {
       const rect = this.canvas.rect(0, 0, 150, 80, 10);
       node.shape
         .push(rect
-          .attr({ stroke: color, 'stroke-width': 2, fill: color, 'fill-opacity': 0}));
+          .attr({ stroke: color, 'stroke-width': 3, fill: color, 'fill-opacity': 0}));
         //.push(this.canvas.text(0, 30, node.label || node.id))
       node.shape.translate(node.point[0], node.point[1])
       node.shape.connections = []
@@ -156,7 +167,12 @@ Raphael.fn.connection = function Connection(obj1, obj2, style) {
   const self = this
 
   /* create and return new connection */
-  const edge = {
+  const edge: {
+    fg?: any;
+    bg?: any;
+    label?: any;
+    draw(): void;
+  } = {
 
     /* eslint-disable complexity */
     draw() {
@@ -164,7 +180,7 @@ Raphael.fn.connection = function Connection(obj1, obj2, style) {
 
       /* distances between objects and according coordinates connection */
       const d = {}
-      const dis = []
+      const dis: number[] = []
       let dx
       let dy
 
@@ -215,11 +231,11 @@ Raphael.fn.connection = function Connection(obj1, obj2, style) {
         const norm = (x, l) => -x * (l || 5) / mag
         // calculate array coordinates (two lines orthogonal to the path vector)
         const arc = [{
-          x: (norm(x4 - x3) + norm(y4 - y3) + x4).toFixed(3),
-          y: (norm(y4 - y3) + norm(x4 - x3) + y4).toFixed(3),
+          x: (norm(x4 - x3, null) + norm(y4 - y3, null) + x4).toFixed(3),
+          y: (norm(y4 - y3, null) + norm(x4 - x3, null) + y4).toFixed(3),
         }, {
-          x: (norm(x4 - x3) - norm(y4 - y3) + x4).toFixed(3),
-          y: (norm(y4 - y3) - norm(x4 - x3) + y4).toFixed(3),
+          x: (norm(x4 - x3, null) - norm(y4 - y3, null) + x4).toFixed(3),
+          y: (norm(y4 - y3, null) - norm(x4 - x3, null) + y4).toFixed(3),
         }]
         path = `${path},M${arc[0].x},${arc[0].y},L${x4},${y4},L${arc[1].x},${arc[1].y}`
       }
@@ -232,7 +248,7 @@ Raphael.fn.connection = function Connection(obj1, obj2, style) {
         edge.fg[move]({ path })
       } else {
         edge.fg = self.path(path)
-          .attr({ stroke: style && style.stroke || '#FFF', fill: 'none' })
+          .attr({ stroke: style && style.stroke || '#FFF', fill: 'none', 'stroke-width': 2 })
           .toBack()
       }
       if (edge.bg) {

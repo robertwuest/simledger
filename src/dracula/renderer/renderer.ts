@@ -13,6 +13,13 @@ import forEach from 'lodash/forEach.js';
  * Can transform coordinates to fit onto the canvas
  */
 export default class Renderer {
+  graph: any;
+  element: any;
+  width: any;
+  height: any;
+  radius: number;
+  factorX: number;
+  factorY: number;
   /**
    * @param {DomElement|String} element target dom element or querySelector
    * @param {Graph} graph Dracula Graph instance
@@ -66,7 +73,7 @@ export default class Renderer {
     throw new Error('not implemented')
   }
 
-  static render(...a) {
+  static render(...a: ConstructorParameters<typeof Renderer>) {
     return new Renderer(...a)
   }
 }

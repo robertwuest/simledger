@@ -1,17 +1,21 @@
 <template>
-  <div class="sml-node-editor__container">
-    <div class="sml-node-editor">
-      <div class="sml-node-editor__control" v-if="selectedNode"><h4>Add Transaction</h4>
-        <div class="sml-node-editor__tx">
-        <div class="tx__connect">From: <USelect v-model="fromNodeId" :items="getNodes" class="w-48" placeholder="Select node" />
-            To: <USelect v-model="toNodeId" :items="getNodes" class="w-48" placeholder="Select node" /></div>
-          <div class="tx__amount">Amount:<input type="number" v-model="txAmount" /></div>
+  <div class="sml-node-editor">
+    <div class="sml-node-editor__control" v-if="selectedNode"><h4 class="font-bold text-lg">Add Transaction</h4>
+      <div class="sml-node-editor__tx">
+        <div class="tx__connect">
+          <UBadge color="neutral" trailing-icon="i-lucide-arrow-right-from-line" size="lg">From</UBadge>
+          <USelect v-model="fromNodeId" :items="getNodes" class="w-48" placeholder="Select node" />
+          <UBadge color="neutral" trailing-icon="i-lucide-arrow-right-to-line" size="lg">To</UBadge>
+          <USelect v-model="toNodeId" :items="getNodes" class="w-48" placeholder="Select node" />
         </div>
-        <button v-on:click="orderTransaction()">Add Transaction</button>
+      <div class="tx__amount"><UBadge color="neutral" trailing-icon="i-lucide-banknote" size="lg">Amount</UBadge><UInputNumber v-model="txAmount" :step="10" /></div>
+              <UButton v-on:click="orderTransaction()">Add Transaction</UButton>
       </div>
-      <div class="sml-node-editor__control" v-if="selectedNode"><h4>Controls</h4>
-        <button v-on:click="minePendingTransactions()">Mine New Block</button>
-        <button v-on:click="validateChain()">Validate current chain</button>
+    </div>
+    <div class="sml-node-editor__control" v-if="selectedNode"><h4 class="font-bold text-lg">Controls</h4>
+      <div class="sml-node-editor__tx">
+      <UButton v-on:click="minePendingTransactions()">Mine New Block</UButton>
+      <UButton v-on:click="validateChain()">Validate current chain</UButton>
       </div>
     </div>
   </div>
@@ -94,14 +98,12 @@ function validateChain() {
   }
   .sml-node-editor__tx {
     display: flex;
+    gap: 8px;
     flex-wrap: wrap;
   }
   .sml-node-editor__tx .tx__connect, .sml-node-editor__tx .tx__amount {
     display: flex;
-    flex-grow: 1;
-    align-items: center;
-    margin-bottom: 8px;
-    justify-content: stretch;
+    gap: 8px;
   }
   .sml-node-editor__tx .tx__amount {
     width: 30%;
@@ -114,16 +116,5 @@ function validateChain() {
     flex-grow: 1;
     min-width: 160px;
     margin: 0 8px;
-  }
-  .sml-node-editor__control {
-    padding: 5px;
-    flex-grow: 1;
-    border: 1px solid var(--frame-border);
-    display: flex;
-    flex-direction: column;
-  }
-  .sml-node-editor__control button {
-    margin-bottom: 5px;
-    cursor: pointer;
   }
 </style>
