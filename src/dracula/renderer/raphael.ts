@@ -6,13 +6,13 @@
  */
 /* eslint-disable */
 import ImportedRaphael from 'raphael';
-import Renderer from './renderer.js';
+import Renderer from './renderer';
 
 // Is not bundled for the standalone browser version (e.g. for CDN)
 const Raphael = typeof window !== 'undefined' && window.Raphael || ImportedRaphael
 
 const dragify = (shape) => {
-  const r = shape.paper
+  const r = shape.paper;
   shape.items.forEach((item) => {
     item.set = shape;
     if (item.type === 'text') {
@@ -20,50 +20,51 @@ const dragify = (shape) => {
     }
     item.node.style.cursor = 'move';
     item.drag(
-      function dragMove(dx, dy, x, y) {
-        dx = this.set.ox;
-        dy = this.set.oy;
-        /*const bBox = this.set.getBBox();
-        const newX = x - dx + (bBox.x + bBox.width / 2);
-        const newY = y - dy + (bBox.y + bBox.height / 2);
-        const clientX =
-          x - (newX < 20 ? newX - 20 : newX > r.width - 20 ? newX - r.width + 20 : 0);
-        const clientY =
-          y - (newY < 20 ? newY - 20 : newY > r.height - 20 ? newY - r.height + 20 : 0);*/
-        this.set.translate(x - Math.round(dx), y - Math.round(dy));
-        shape.connections.forEach((connection) => {
-          connection.draw()
-        });
-        this.set.ox = x;
-        this.set.oy = y;
-        const shapeBounds = this.node.getBoundingClientRect();
-        const parentBounds = this.node.parentElement.getBoundingClientRect();
+      function dragMove(dx, dy, x, y, e) {
+        if (e.which === 1) {
+          dx = this.set.ox;
+          dy = this.set.oy;
+          this.set.translate(x - Math.round(dx), y - Math.round(dy));
+          shape.connections.forEach((connection) => {
+            connection.draw()
+          });
+          this.set.ox = x;
+          this.set.oy = y;
+          const shapeBounds = this.node.getBoundingClientRect();
+          const parentBounds = this.node.parentElement.getBoundingClientRect();
 
-        const event = new CustomEvent('shapeDragMove', { detail: {
-            item,
-            x: shapeBounds.x - parentBounds.x,
-            y: shapeBounds.y - parentBounds.y,
-          }
-        });
-        window.dispatchEvent(event);
+          const event = new CustomEvent('shapeDragMove', { detail: {
+              item,
+              x: shapeBounds.x - parentBounds.x,
+              y: shapeBounds.y - parentBounds.y,
+              pageX: e.pageX,
+              pageY: e.pageY,
+            }
+          });
+          window.dispatchEvent(event);
+        }
       },
-      function dragEnter(x, y) {
-        this.set.ox = x;
-        this.set.oy = y;
-        this.animate({ 'fill-opacity': 0.2 }, 500);
-        const event = new CustomEvent('shapeDragMove', { detail: {
-            item,
-          }
-        });
-        window.dispatchEvent(event);
+      function dragEnter(x, y, e) {
+        if (e.which === 1) {
+          this.set.ox = x;
+          this.set.oy = y;
+          this.animate({ 'fill-opacity': 0.2 }, 500);
+          const event = new CustomEvent('shapeDragMove', { detail: {
+              item,
+            }
+          });
+          window.dispatchEvent(event);
+        }
       },
-      function dragOut() {
-        this.animate({ 'fill-opacity': 0.0 }, 500);
-        const event = new CustomEvent('shapeDragMove', { detail: {
-            item,
-          }
-        });
-        window.dispatchEvent(event);
+      function dragOut(e) {
+        if (e.which === 1) {
+          this.animate({ 'fill-opacity': 0.0 }, 500);
+          const event = new CustomEvent('shapeDragMove', { detail: {
+              item,
+            }
+          });
+          window.dispatchEvent(event);
+        }
       })
   })
 }
@@ -78,17 +79,62 @@ export default class RaphaelRenderer extends Renderer {
       stroke: '#443399',
       'stroke-width': '2px',
     }
-  }
-    element(element: any, width: any, height: any): any {
-        throw new Error('Method not implemented.');
-    }
-    width(element: any, width: any, height: any): any {
-        throw new Error('Method not implemented.');
-    }
-    height(element: any, width: any, height: any): any {
-        throw new Error('Method not implemented.');
-    }
 
+    let drag: { elem: any | null; x: number; y: number; state: boolean } = {
+        elem: null,
+        x: 0,
+        y: 0,
+        state: false
+    };
+    let delta = {
+        x: 0,
+        y: 0
+    };
+    this.element.addEventListener("mousedown", (e: MouseEvent) => {
+      if (!drag.state && e.which == 2) {
+            drag.elem = this.element;
+            drag.x = e.x;
+            drag.y = e.y;
+            drag.state = true;
+        }
+        return false;
+    });
+
+    this.element.addEventListener("mousemove", (e: MouseEvent) => {
+      if (drag.state) {
+        delta.x = e.x - drag.x;
+        delta.y = e.y - drag.y;
+        const svg = drag.elem.querySelector('svg');
+        const viewBox = svg.hasAttribute('viewBox') ? svg.getAttribute('viewBox').split(' ').map(Number) : [0, 0, this.width, this.height];
+        viewBox[0] -= delta.x;
+        viewBox[1] -= delta.y;
+        svg.setAttribute('viewBox', viewBox.join(' '));
+        drag.elem.style.backgroundPosition = `${-viewBox[0]}px ${-viewBox[1]}px`;
+        const event = new CustomEvent('viewDragMove', { detail: {
+            viewBox
+          }
+        });
+        window.dispatchEvent(event);
+        drag.x = e.x;
+        drag.y = e.y;
+      }
+    });
+
+    this.element.addEventListener("mouseup", (e: MouseEvent) => {
+      if (drag.state) {
+        drag.state = false;
+      }
+    });
+  }
+  element(element: any, width: any, height: any): any {
+      throw new Error('Method not implemented.');
+  }
+  width(element: any, width: any, height: any): any {
+      throw new Error('Method not implemented.');
+  }
+  height(element: any, width: any, height: any): any {
+      throw new Error('Method not implemented.');
+  }
   drawNode(node) {
     const color = Raphael.getColor()
     // TODO update / cache shape

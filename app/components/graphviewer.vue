@@ -2,24 +2,24 @@
   <div class="sml-graph-viewer" ref="graphViewer">
     <div class="sml-graph-viewer__nodes">
       <div id="canvas" class="canvas" v-on:click="closeAllContextMenus()">
-      </div>
-      <div v-bind:class="{ 'sml-graph-viewer__node--mining' : node.systemNode.isMining === true, 'sml-graph-viewer__node--selected': node.systemNode.id === selectedNodeId }"
-           class="sml-graph-viewer__node"
-           v-for="(node, index) in nodes"
-           :key="node.systemNode.id" :id="node.systemNode.id" >
-        <h3>{{ node.systemNode.id }}</h3>
-        <div>Balance: {{ node.systemNode.getBalance() }}</div>
-        <img class="sml-graph-viewer__node-process" :src="`/img/icons/gears.svg`" alt="" fill="#FF0000"/>
-        <img class="sml-graph-viewer__node-pow-lottery" :src="`/img/icons/die${ node.systemNode.miningDelay + 1 }.svg`" alt=""/>
-        <div class="sml-graph-viewer__node-progress-bar"><span v-bind:style="{ width: `${ node.systemNode.getRemainingMiningDelayPercentage() }%` }"></span></div>
-        <img class="sml-graph-viewer__node-error" :src="`/icons/error.svg`" alt=""/>
-        <div class="sml-graph-viewer__node-connector">
-          <img class="connect" :src="`/img/icons/connect.svg`" alt="" v-on:click="$event.target.parentElement.classList.toggle('open'); $event.stopPropagation()"/>
-          <div class="c-menu">
-            <div class="c-menu-item" v-for="subNode in nodes.filter(nd => nd.systemNode.id !== node.systemNode.id)" :key="`${subNode.systemNode.id}-menu-${index}`" v-on:click="connectDisconnectNodes(subNode.systemNode, node.systemNode)">
-              {{subNode.systemNode.id}}
-              <img v-if="node.systemNode.connectedNodes.find(nd => nd.node.id === subNode.systemNode.id)" :src="`/img/icons/connected.svg`" alt=""/>
-              <img v-if="!node.systemNode.connectedNodes.find(nd => nd.node.id === subNode.systemNode.id)" :src="`/img/icons/disconnected.svg`" alt=""/>
+        <div v-bind:class="{ 'sml-graph-viewer__node--mining' : node.systemNode.isMining === true, 'sml-graph-viewer__node--selected': node.systemNode.id === selectedNodeId }"
+            class="sml-graph-viewer__node"
+            v-for="(node, index) in nodes"
+            :key="node.systemNode.id" :id="node.systemNode.id" >
+          <h3>{{ node.systemNode.id }}</h3>
+          <div>Balance: {{ node.systemNode.getBalance() }}</div>
+          <img class="sml-graph-viewer__node-process" :src="`/img/icons/gears.svg`" alt="" fill="#FF0000"/>
+          <img class="sml-graph-viewer__node-pow-lottery" :src="`/img/icons/die${ node.systemNode.miningDelay + 1 }.svg`" alt=""/>
+          <div class="sml-graph-viewer__node-progress-bar"><span v-bind:style="{ width: `${ node.systemNode.getRemainingMiningDelayPercentage() }%` }"></span></div>
+          <img class="sml-graph-viewer__node-error" :src="`/icons/error.svg`" alt=""/>
+          <div class="sml-graph-viewer__node-connector">
+            <img class="connect" :src="`/img/icons/connect.svg`" alt="" v-on:click="$event.target.parentElement.classList.toggle('open'); $event.stopPropagation()"/>
+            <div class="c-menu">
+              <div class="c-menu-item" v-for="subNode in nodes.filter(nd => nd.systemNode.id !== node.systemNode.id)" :key="`${subNode.systemNode.id}-menu-${index}`" v-on:click="connectDisconnectNodes(subNode.systemNode, node.systemNode)">
+                {{subNode.systemNode.id}}
+                <img v-if="node.systemNode.connectedNodes.find(nd => nd.node.id === subNode.systemNode.id)" :src="`/img/icons/connected.svg`" alt=""/>
+                <img v-if="!node.systemNode.connectedNodes.find(nd => nd.node.id === subNode.systemNode.id)" :src="`/img/icons/disconnected.svg`" alt=""/>
+              </div>
             </div>
           </div>
         </div>
@@ -35,6 +35,7 @@ import { ref, onMounted, defineProps, defineEmits, defineExpose } from 'vue';
 import { gsap } from 'gsap';
 import { MotionPathPlugin } from 'gsap/MotionPathPlugin';
 import { SystemNode } from '../../src/network/system_node';
+import { vi } from '@nuxt/ui/runtime/locale/index.js';
 
 
 gsap.registerPlugin(MotionPathPlugin);
@@ -60,6 +61,7 @@ onMounted(async () => {
   const Layout = (await import('../../src/dracula')).Layout;
   const Renderer = (await import('../../src/dracula')).Renderer;
   browserDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  // drag move element in svg
   window.addEventListener('shapeDragMove', (event: any) => {
     closeAllContextMenus();
     if (props.nodes) {
@@ -71,6 +73,15 @@ onMounted(async () => {
       }
     }
   });
+  window.addEventListener('viewDragMove', (event: any) => {
+    closeAllContextMenus();
+    props.nodes.forEach((node: any) => {
+      const shapeBounds = node.graphRef.shape.items[0].node.getBoundingClientRect();
+      const parentBounds = node.graphRef.shape.items[0].node.parentElement.getBoundingClientRect();
+      node.element.style.transform = `translate(${shapeBounds.x - parentBounds.x}px, ${shapeBounds.y - parentBounds.y}px)`;
+    });
+  });
+  window.addEventListener("resize", onResize);
   visualGraph.value = new Graph();
   setTimeout(() => {
     const element = graphViewer.value as HTMLDivElement;
@@ -82,7 +93,6 @@ onMounted(async () => {
       if (!node.element) {
         setTimeout(() => {
         node.element = document.querySelector(`#${node.systemNode.id}`);
-        console.log(node);
         const shapeBounds = node.graphRef.shape.items[0].node.getBoundingClientRect();
         const parentBounds = node.graphRef.shape.items[0].node.parentElement.getBoundingClientRect();
         node.element.style.transform = `translate(${shapeBounds.x - parentBounds.x}px, ${shapeBounds.y - parentBounds.y}px)`;
@@ -100,7 +110,12 @@ function closeAllContextMenus() {
 
 function onResize() {
   const element = graphViewer.value as HTMLDivElement;
+  const svg = element.querySelector('svg') as SVGElement;
   renderer.value.canvas.setSize(element.clientWidth, element.clientHeight);
+  const viewBox = svg.hasAttribute('viewBox') ? svg.getAttribute('viewBox').split(' ').map(Number) : [0, 0, element.clientWidth, element.clientHeight];
+  viewBox[2] = element.clientWidth;
+  viewBox[3] = element.clientHeight;
+  svg.setAttribute('viewBox', viewBox.join(' '));
 }
 
 function addNode(nodeId: string) {
@@ -192,13 +207,23 @@ defineExpose({
     height: 25px;
   }
   .sml-graph-viewer__nodes {
+    position: relative;
+    overflow: hidden;
+    min-width: 100%;
+    min-height: 100%;
     display: flex;
-    height: 100%;
   }
   .sml-graph-viewer__nodes .canvas {
-    height: 100%;
-    width: 100%;
-    text-align: left;
+    background-image: radial-gradient(circle, var(--ui-border-accented) 1.1px, transparent 1px);
+    background-size: 30px 30px;
+    min-width: 100%;
+    min-height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    position: absolute;
+  }
+  .sml-graph-viewer__nodes .canvas svg {
+    overflow: hidden;
   }
   .sml-graph-viewer__node {
     top: 0;

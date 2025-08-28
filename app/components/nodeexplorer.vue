@@ -1,6 +1,6 @@
 <template>
   <div class="sml-node-explorer">
-    <USelect v-model="selectedNodeId" :items="getNodes" class="w-48" placeholder="Select node" />
+    <USelect v-model="selectedNode" :items="getNodes" class="w-48" placeholder="Select node" />
     <div v-if="selectedNode" class="sml-node-explorer__ledger">
       <h4>Ledger</h4>
       <ul v-for="block in selectedNode.blockchain.chain" :key="block.hash">
@@ -46,12 +46,12 @@ const props = defineProps<{
 const emit = defineEmits(["node-changed"]);
 
 const selectedNode = ref<SystemNode|null>(null);
-const selectedNodeId = ref<string|null>(null);
 const selectedBlockIndex = ref<number>(-1);
 
-watch(selectedNodeId, (newVal, oldVal) => {
+/*
+watch(selectedNode, (newVal, oldVal) => {
   updateSelectedNode(newVal);
-});
+});*/
 
 const getNodes = computed(() => {
   return props.nodes.map((node) => ({ label: node.systemNode.id, value: node.systemNode }));
@@ -95,6 +95,7 @@ defineExpose({
     flex-direction: column;
     text-align: left;
     padding: 5px;
+    overflow-y: auto;
   }
   .sml-node-explorer .vs__dropdown-toggle {
     border: 1px solid var(--frame-border);

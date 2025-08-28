@@ -5,7 +5,7 @@
  https://github.com/strathausen/dracula
  */
 /* eslint-disable */
-import forEach from 'lodash/forEach.js';
+import forEach from 'lodash/forEach';
 
 /**
  * Base class for rendering nodes

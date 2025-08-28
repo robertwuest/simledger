@@ -4,9 +4,9 @@
       <div class="sml-node-editor__tx">
         <div class="tx__connect">
           <UBadge color="neutral" trailing-icon="i-lucide-arrow-right-from-line" size="lg">From</UBadge>
-          <USelect v-model="fromNodeId" :items="getNodes" class="w-48" placeholder="Select node" />
+          <USelect v-model="fromNode" :items="getNodes" class="w-48" placeholder="Select node" />
           <UBadge color="neutral" trailing-icon="i-lucide-arrow-right-to-line" size="lg">To</UBadge>
-          <USelect v-model="toNodeId" :items="getNodes" class="w-48" placeholder="Select node" />
+          <USelect v-model="toNode" :items="getNodes" class="w-48" placeholder="Select node" />
         </div>
       <div class="tx__amount"><UBadge color="neutral" trailing-icon="i-lucide-banknote" size="lg">Amount</UBadge><UInputNumber v-model="txAmount" :step="10" /></div>
               <UButton v-on:click="orderTransaction()">Add Transaction</UButton>
@@ -35,19 +35,10 @@ const props = defineProps<{
   selectedNodeId: string
 }>();
 
-const fromNodeId = ref<string|null>(null);
-const toNodeId = ref<string|null>(null);
+
 const fromNode = ref<SystemNode|null>(null);
 const toNode = ref<SystemNode|null>(null);
 const txAmount = ref<number>(0.0);
-
-watch(fromNodeId, (newVal, oldVal) => {
-  fromNode.value = props.nodes.find(node => node.systemNode.id === newVal)?.systemNode || null;
-});
-
-watch(toNodeId, (newVal, oldVal) => {
-  toNode.value = props.nodes.find(node => node.systemNode.id === newVal)?.systemNode || null;
-});
 
 const getNodes = computed(() => {
   return props.nodes.map((node) => ({ label: node.systemNode.id, value: node.systemNode }));
@@ -67,10 +58,10 @@ function getCurrentNode() {
 function orderTransaction() {
   if (fromNode.value && toNode.value && txAmount.value > 0) {
     selectedNode.value.systemNode.orderTransaction(
-      fromNode.value.node.address,
-      toNode.value.node.address,
+      fromNode.value.address,
+      toNode.value.address,
       txAmount.value,
-      fromNode.value.node.keyPair
+      fromNode.value.keyPair
     );
   }
 }
