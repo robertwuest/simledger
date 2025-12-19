@@ -56,7 +56,6 @@ import GraphViewer from './graphviewer.vue';
 import NodeExplorer from './nodeexplorer.vue';
 import NodeEditor from './nodeeditor.vue';
 import { System } from '~~/src/network/system';
-import { defineExpose } from 'vue';
 
 gsap.registerPlugin(MotionPathPlugin);
 
