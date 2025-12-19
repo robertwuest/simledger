@@ -1,3 +1,23 @@
+<!--
+  NodeExplorer Component
+  
+  Displays blockchain state for a selected node including:
+  - Transaction ledger (all transactions by block)
+  - Pending transactions (not yet mined)
+  - Full blockchain visualization with clickable blocks
+  - Transaction details (sender, recipient, amount)
+  
+  Props:
+  - nodes: Array of network node objects
+  
+  Events:
+  - node-changed: Emitted when user selects a different node
+  
+  Exposed methods:
+  - updateSelectedNode(node): Update selected node
+  - findAddressId(address): Convert address to human-readable format
+  - getNodes: Computed property returning list of nodes
+-->
 <template>
   <div class="sml-node-explorer">
     <USelect v-model="selectedNode" :items="getNodes" class="w-48" placeholder="Select node" />
@@ -57,6 +77,10 @@ const getNodes = computed(() => {
   return props.nodes.map((node) => ({ label: node.systemNode.id, value: node.systemNode }));
 });
 
+/**
+ * Updates the selected node and resets the block selection
+ * @param {SystemNode} node - The node to select
+ */
 function updateSelectedNode(node: any) {
   selectedNode.value = node;
   selectedBlockIndex.value = -1;
@@ -65,6 +89,12 @@ function updateSelectedNode(node: any) {
   }
 }
 
+/**
+ * Converts an address to a human-readable format
+ * Returns node ID if address belongs to a network node, otherwise returns abbreviated address
+ * @param {string} address - The address to convert (Base58 encoded or special)
+ * @returns {string} HTML string with human-readable address representation
+ */
 function findAddressId(address: string) {
   if (address === '_') {
     return '&#9889;'; // Mining transaction source

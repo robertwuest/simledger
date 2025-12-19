@@ -1,5 +1,25 @@
 
 
+<!--
+  Dashboard Component
+  
+  Main layout component orchestrating the blockchain network simulator.
+  Manages the layout of three sub-components:
+  - GraphViewer (65%): Network topology visualization
+  - NodeExplorer (right top): Blockchain state explorer
+  - NodeEditor (right bottom): Node creation and transaction interface
+  
+  Props:
+  - nodes: Array of node objects in the network
+  
+  Events:
+  - dashboard-ready: Emitted when dashboard is fully initialized
+  
+  Exposed methods:
+  - addNode(id): Create a new node in the network
+  - connectNodes(nodeA, nodeB): Connect two nodes
+  - orderTransaction(fromAddress, toAddress, amount, signingKey, issuingNode): Send transaction
+-->
 <template>
   <div class="sml-dashboard">
   <splitpanes class="default-theme" horizontal
@@ -67,6 +87,13 @@ function getNodes() {
   }));
 }
 
+/**
+ * Creates a new node in the network with blockchain instance
+ * Automatically adds node to graph visualization
+ * Subscribes to node events for animation and error handling
+ * @param {string} id - Unique identifier for the new node
+ * @returns {Object} Node object with systemNode, graphRef, and element properties
+ */
 function addNode(id: string): any {
   const found = props.nodes.find(item => item.systemNode.id === id);
   if (!found) {
@@ -103,12 +130,23 @@ function paneResized() {
   graphViewer.value?.onResize();
 }
 
+/**
+ * Connects two network nodes bidirectionally
+ * Updates both system network and graph visualization
+ * @param {Object} nodeA - Node A with systemNode property
+ * @param {Object} nodeB - Node B with systemNode property
+ */
 function connectNodes(nodeA: any, nodeB: any) {
   if (nodeA.systemNode.connectToNode(nodeB.systemNode)) {
     graphViewer.value?.connectNodes(nodeA.systemNode.id, nodeB.systemNode.id);
   }
 }
 
+/**
+ * Handles graph node click events
+ * Updates the explorer to show the selected node's blockchain state
+ * @param {string} nodeId - The clicked node's ID
+ */
 function onGraphNodeClicked(nodeId: string) {
   const found = props.nodes.find(node => node.systemNode.id === nodeId);
   if (found) {
@@ -117,10 +155,21 @@ function onGraphNodeClicked(nodeId: string) {
   }
 }
 
+/**
+ * Handles node selection change from the explorer
+ * Updates the selected node ID for highlighting in the graph
+ * @param {string} nodeId - The selected node's ID
+ */
 function onExplorerNodeChanged(nodeId: string) {
   selectedNodeId.value = nodeId;
 }
 
+/**
+ * Processes system node events (mining, broadcasting, errors)
+ * Animates transactions and blocks through the network
+ * @param {Object} event - System event from node's eventEmitter
+ * @param {Object} sender - The node that emitted the event
+ */
 function onSystemNodeEvent(event: any, sender: any) {
   if (sender.graphRef) {
     sender.graphRef.edges.forEach((edge: any) => {
@@ -146,6 +195,15 @@ function onSystemNodeEvent(event: any, sender: any) {
   }
 }
 
+/**
+ * Orders a transaction from one address to another
+ * Signs with provided key and broadcasts to the network
+ * @param {string} fromAddress - Sender's address
+ * @param {string} toAddress - Recipient's address
+ * @param {number} amount - Transaction amount in coins
+ * @param {any} signingKey - ECDSA key for signing
+ * @param {Object} issuingNode - Node object with systemNode property
+ */
 function orderTransaction(fromAddress: string, toAddress: string, amount: number, signingKey: any, issuingNode: { systemNode: SystemNode }) {
   issuingNode.systemNode.orderTransaction(
     fromAddress,

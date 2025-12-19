@@ -1,46 +1,65 @@
 /**
- * Graph Dracula is a set of tools to display and layout interactive graphs, along with various related algorithms.
- Based on JavaScript and SVG.
- The code is released under the MIT license, so commercial use is not a problem.
- https://github.com/strathausen/dracula
+ * Graph Dracula - Interactive Graph Visualization and Layout
+ * 
+ * A comprehensive library for displaying and laying out interactive graphs using JavaScript and SVG.
+ * Provides graph data structures, multiple layout algorithms, and renderers for visualization.
+ * 
+ * https://github.com/strathausen/dracula
  */
 /* eslint-disable */
 import forEach from 'lodash/forEach';
+import type Dracula from '../dracula';
 
 /**
- * Base class for rendering nodes
- *
- * Can transform coordinates to fit onto the canvas
+ * Base Renderer Class for Graph Visualization
+ * 
+ * Provides the foundation for all graph rendering implementations.
+ * Handles coordinate transformation from graph space to canvas space.
+ * 
+ * Subclasses implement:
+ * - drawNode(node): Render individual nodes
+ * - drawEdge(edge): Render individual edges
+ * 
+ * @abstract
+ * @class Renderer
  */
 export default class Renderer {
-  graph: any;
-  element: any;
-  width: any;
-  height: any;
+  graph: Dracula;
+  element: HTMLElement;
+  width: number;
+  height: number;
   radius: number;
   factorX: number;
   factorY: number;
+  
   /**
-   * @param {DomElement|String} element target dom element or querySelector
-   * @param {Graph} graph Dracula Graph instance
-   * @param {number} width (optional) width of the canvas, default 400
-   * @param {number} height (optional) height of the canvas, default 300
+   * Creates a new Renderer instance
+   * 
+   * @param {HTMLElement|string} element - Target DOM element or CSS selector
+   * @param {Dracula} graph - The graph to render
+   * @param {number} [width=400] - Canvas width in pixels
+   * @param {number} [height=300] - Canvas height in pixels
    */
-  constructor(element, graph, width, height) {
+  constructor(element: HTMLElement | string, graph: Dracula, width: number, height: number) {
     this.graph = graph
     // Convert a query into a dom element
     if (typeof element === 'string') {
-      element = (typeof $ !== 'undefined') ? $(element)[0] : document.querySelector(element)
+      element = document.querySelector(element) as HTMLElement;
     }
     this.element = element
     this.width = width || 400
     this.height = height || 300
     this.radius = 40
+    this.factorX = 0
+    this.factorY = 0
   }
 
   /**
-   * Scale the nodes within the canvas dimensions
-   * Keep a distance to the canvas edges of half a node radius
+   * Performs the rendering by drawing all nodes and edges
+   * 
+   * Calculates scale factors to fit the graph into the canvas with padding.
+   * Transforms each node's layout position to canvas coordinates.
+   * Then renders all nodes and edges.
    */
   draw() {
     this.factorX = (this.width - 2 * this.radius) /
@@ -58,21 +77,49 @@ export default class Renderer {
     })
   }
 
-  translate(point) {
+  /**
+   * Transforms graph space coordinates to canvas space coordinates
+   * Applies scale factors and offset to fit graph onto canvas with padding
+   * 
+   * @param {number[]} point - [x, y] coordinates in graph space
+   * @returns {number[]} [x, y] coordinates in canvas space
+   */
+  translate(point: number[]) {
     return [
       Math.round((point[0] - this.graph.layoutMinX) * this.factorX + this.radius),
       Math.round((point[1] - this.graph.layoutMinY) * this.factorY + this.radius),
     ]
   }
 
-  drawNode(node) { // eslint-disable-line no-unused-vars, class-methods-use-this
+  /**
+   * Renders a node - to be implemented by subclasses
+   * 
+   * @abstract
+   * @param {DraculaNode} node - The node to render
+   * @throws {Error} If not implemented by subclass
+   */
+  drawNode(node: any) { // eslint-disable-line no-unused-vars, class-methods-use-this
     throw new Error('not implemented')
   }
 
-  drawEdge(edge) { // eslint-disable-line no-unused-vars, class-methods-use-this
+  /**
+   * Renders an edge - to be implemented by subclasses
+   * 
+   * @abstract
+   * @param {DraculaEdge} edge - The edge to render
+   * @throws {Error} If not implemented by subclass
+   */
+  drawEdge(edge: any) { // eslint-disable-line no-unused-vars, class-methods-use-this
     throw new Error('not implemented')
   }
 
+  /**
+   * Factory method to create a new Renderer instance
+   * 
+   * @static
+   * @param {...any} args - Constructor arguments
+   * @returns {Renderer} A new Renderer instance
+   */
   static render(...a: ConstructorParameters<typeof Renderer>) {
     return new Renderer(...a)
   }

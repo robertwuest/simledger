@@ -1,9 +1,3 @@
-/**
- * Graph Dracula is a set of tools to display and layout interactive graphs, along with various related algorithms.
- Based on JavaScript and SVG.
- The code is released under the MIT license, so commercial use is not a problem.
- https://github.com/strathausen/dracula
- */
 /* eslint-disable */
 import forEach from 'lodash/forEach.js';
 import Layout from './layout.js'
@@ -11,6 +5,32 @@ import Layout from './layout.js'
 /**
  * TODO take ratio into account
  * TODO use integers for speed
+ * Spring Layout Algorithm
+ * 
+ * A force-directed graph layout that simulates a physics system:
+ * - Nodes repel each other (Coulomb repulsion)
+ * - Edges attract their connected nodes (Hooke's law spring force)
+ * - Iteratively settles into a natural equilibrium
+ * 
+ * The algorithm:
+ * 1. Initialize all forces to zero
+ * 2. For each iteration (default 500):
+ *    - Calculate repulsive forces between all node pairs
+ *    - Calculate attractive forces along edges
+ *    - Move nodes based on accumulated forces with damping
+ * 3. Converges to a stable layout with minimal edge crossings
+ * 
+ * Best for: General-purpose graph visualization, organic layouts
+ * 
+ * Parameters:
+ * - iterations: Number of force calculation rounds (more = better but slower)
+ * - maxRepulsiveForceDistance: Distance beyond which repulsion is ignored
+ * - k: Spring constant (affects layout spacing)
+ * - c: Damping constant (controls movement smoothness)
+ * - maxVertexMovement: Max movement per iteration (prevents oscillation)
+ * 
+ * @class Spring
+ * @extends Layout
  */
 export default class Spring extends Layout {
   iterations: number;
@@ -18,6 +38,12 @@ export default class Spring extends Layout {
     k: number;
     c: number;
     maxVertexMovement: number;
+  
+  /**
+   * Creates a Spring layout and immediately computes node positions
+   * 
+   * @param {Dracula} graph - The graph to layout
+   */
   constructor(graph) {
     super(graph)
     this.iterations = 500

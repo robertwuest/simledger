@@ -4,7 +4,19 @@ import { Block } from './block'; // eslint-disable-line
 
 /**
  * Instance class for a blockchain
+ * 
+ * Represents a complete blockchain with proof-of-work consensus. Manages the chain of blocks,
+ * pending transactions, mining operations, and chain validation.
+ * 
  * This code is based on the original implementations by Xavier Decuyper https://www.codementor.io/@savjee
+ * 
+ * @class Blockchain
+ * @property {Block[]} chain - Array of blocks in the blockchain
+ * @property {number} difficulty - Number of leading zeros required in block hash (proof-of-work)
+ * @property {Transaction[]} pendingTransactions - Transactions waiting to be included in next block
+ * @property {number} miningReward - Reward in coins given to miner for successfully mining a block
+ * @property {string} genesisAddress - Address of the genesis block recipient
+ * @property {Function[]} logSubscribers - Callbacks for logging blockchain events
  */
 export class Blockchain {
   chain: Block[];
@@ -14,6 +26,10 @@ export class Blockchain {
   genesisAddress: string;
   logSubscribers: any[] = [];
 
+  /**
+   * Creates a new Blockchain instance with a genesis block
+   * Initializes with difficulty = 1, mining reward = 10.0, and empty pending transactions
+   */
   constructor() {
     // assume a value for difficulty - when using simulated delay it should be set 1
     this.difficulty = 1;
@@ -29,7 +45,9 @@ export class Blockchain {
   }
 
   /**
-   * Creates the genesis block
+   * Creates the genesis block - the first block in the blockchain
+   * 
+   * @returns {Block} The genesis block with predefined values
    */
   createGenesisBlock() {
     return new Block(
@@ -43,7 +61,13 @@ export class Blockchain {
   }
 
   /**
-   * Create new block with all pending transactions and mine it
+   * Creates a new block with all pending transactions and initiates mining
+   * 
+   * The mining process runs in a Web Worker to prevent blocking the UI.
+   * Once mined, the callback is invoked with the new block and reward transaction.
+   * 
+   * @param {string} miningRewardAddress - Address to receive the mining reward
+   * @param {Function} [callback] - Callback function invoked with (newBlock, rewardTx) when mining completes
    */
   minePendingTransactions(miningRewardAddress: string, callback?: (newBlock: any, rewardTx: any) => void) {
     const block = new Block(this.chain.length + 1, SmlCommon.generateTimestamp(), this.pendingTransactions, miningRewardAddress, this.getLatestBlock().rewardAddress, this.getLatestBlock().hash);
@@ -62,9 +86,17 @@ export class Blockchain {
   }
 
   /**
-   * Get the balance of an address
-   * WARNING! The bigger the chain becomes this function gets more expensive since we are using an account based ledger.
-   * Bitcoin for example uses a transaction based ledger where the balance of an account is represented as a transaction
+   * Gets the balance of an address across the entire blockchain
+   * 
+   * Iterates through all blocks and transactions to calculate the total balance.
+   * Sums all received funds and subtracts all spent funds up to the specified block index.
+   * 
+   * WARNING: Performance degrades with blockchain size. This is an account-based ledger
+   * implementation. Bitcoin uses transaction-based UTXOs for better scalability.
+   * 
+   * @param {string} address - The address to calculate balance for
+   * @param {number} [blockIndex=this.chain.length-1] - Block index to calculate balance up to
+   * @returns {number} The balance in coins for the given address
    */
   getBalanceOfAddress(address: string, blockIndex: number = this.chain.length - 1) {
     let balance = 0.0; // you start at zero!
@@ -87,18 +119,24 @@ export class Blockchain {
   }
 
   /**
-   * Truncate the change
-   * @param index
+   * Truncates the blockchain at the specified index
+   * 
+   * Removes all blocks from the chain starting at the given index.
+   * Useful for handling chain forks or resetting to a previous state.
+   * 
+   * @param {number} index - The block index to truncate from
    */
-  truncateChain(index) {
+  truncateChain(index: number) {
     if (index < this.getBlockchainLength()) {
       this.chain.splice(index);
     }
   }
 
   /**
-   * Get block in chain
-   * @param chainLength
+   * Retrieves a specific block from the chain by index
+   * 
+   * @param {number} chainLength - The index of the block to retrieve
+   * @returns {Block|null} The block at the given index, or null if out of bounds
    */
   getBlock(chainLength: number) {
     if (chainLength < this.getBlockchainLength()) {
@@ -108,21 +146,38 @@ export class Blockchain {
   }
 
   /**
-   * Get last added block
+   * Gets the most recently added block in the chain
+   * 
+   * @returns {Block} The last block in the chain
    */
   getLatestBlock() {
     return this.chain[this.chain.length - 1];
   }
 
   /**
-   * Return the lenght of the chain
+   * Gets the total length of the blockchain (number of blocks)
+   * 
+   * @returns {number} The length of the blockchain
    */
   getBlockchainLength() {
     return this.chain.length;
   }
 
   /**
-   * Add new block to chain
+   * Adds a new block to the blockchain with comprehensive validation
+   * 
+   * Validates:
+   * - Block is not a duplicate
+   * - Chain length is sequential
+   * - Block hash is correctly computed
+   * - Previous hash matches last block's hash
+   * - All transactions in block are valid
+   * - Proof-of-work difficulty is satisfied
+   * 
+   * On successful addition, processed transactions are removed from pending queue.
+   * 
+   * @param {Block} block - The block to add to the chain
+   * @returns {boolean} True if block was added, false if validation failed
    */
   addBlock(block: Block) {
     if (block.hash === this.getLatestBlock().hash) {
@@ -161,8 +216,18 @@ export class Blockchain {
   }
 
   /**
-   * Validate integrity of the blockchain
-   * WARNING! The bigger the chain becomes this function gets more expensive
+   * Validates the integrity of the entire blockchain
+   * 
+   * Checks each block's:
+   * - Hash is correctly computed
+   * - Previous hash reference matches preceding block
+   * - All transactions are valid
+   * 
+   * Also validates the genesis block is unchanged.
+   * 
+   * WARNING: Performance degrades with blockchain size. Use sparingly on large chains.
+   * 
+   * @returns {boolean} True if blockchain is valid, false if any block fails validation
    */
   isChainValid() {
     for (let i = 1; i < this.chain.length; i++) {
@@ -197,7 +262,19 @@ export class Blockchain {
   }
 
   /**
-   * Add transaction to blockchain
+   * Adds a transaction to the pending transactions queue
+   * 
+   * Validates:
+   * - From and to addresses are present
+   * - Transaction is not a duplicate
+   * - Transaction signature is valid
+   * - Sender has sufficient balance (including pending transactions)
+   * - Mining reward transactions are handled correctly
+   * 
+   * Valid transactions are added to the pending queue waiting for mining.
+   * 
+   * @param {Transaction} transaction - The transaction to add
+   * @returns {boolean} True if transaction was added, false if validation failed
    */
   addTransaction(transaction: Transaction) {
     if (!transaction.fromAddress || !transaction.toAddress) {
@@ -248,11 +325,26 @@ export class Blockchain {
     return true;
   }
 
+  /**
+   * Registers a callback function to receive blockchain log events
+   * 
+   * Useful for monitoring blockchain activity, errors, and warnings in the UI.
+   * Callback receives: (type: 'log' | 'warn' | 'error', message: string)
+   * 
+   * @param {Function} callback - Function to call when logging occurs
+   */
   registerLogSubscriber(callback: Function) {
     this.logSubscribers.push(callback);
   }
 
-  log(type, message, params?) {
+  /**
+   * Logs a message to the console and notifies all registered log subscribers
+   * 
+   * @param {string} type - Log type: 'log', 'warn', or 'error'
+   * @param {string} message - The message to log
+   * @param {any} [params] - Optional parameters for console formatting
+   */
+  log(type: string, message: string, params?: any) {
     switch (type) {
       case 'warn':
         console.warn(message, params);
@@ -269,7 +361,14 @@ export class Blockchain {
     }
   }
 
-  notifyLogSubscribers(type, message) {
+  /**
+   * Internal method to notify all registered log subscribers of a logging event
+   * 
+   * @private
+   * @param {string} type - Log type: 'log', 'warn', or 'error'
+   * @param {string} message - The message to broadcast
+   */
+  notifyLogSubscribers(type: string, message: string) {
     this.logSubscribers.forEach((subscriber) => {
       subscriber(type, message);
     });

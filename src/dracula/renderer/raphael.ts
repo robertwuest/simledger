@@ -7,31 +7,52 @@
 /* eslint-disable */
 import ImportedRaphael from 'raphael';
 import Renderer from './renderer';
+import type Dracula from '../dracula';
+import type { DraculaEdge, DraculaNode } from '../dracula';
 
 // Is not bundled for the standalone browser version (e.g. for CDN)
 const Raphael = typeof window !== 'undefined' && window.Raphael || ImportedRaphael
 
-const dragify = (shape) => {
+/**
+ * Makes Raphael shapes draggable with event handling
+ * 
+ * Enables interactive dragging for each SVG shape in the set.
+ * Provides three-phase drag lifecycle:
+ * 1. DragMove: Item follows cursor while left-mouse held; triggers shapeDragMove event
+ * 2. DragEnter: Mouse enters shape during drag; animates fill-opacity from 0 to 0.2
+ * 3. DragOut: Mouse leaves shape during drag; animates fill-opacity back to 0
+ * 
+ * Maintains shape offset (ox, oy) and connected edges array.
+ * Re-draws all connected edges in real-time as shape moves.
+ * Only responds to left-mouse (e.which === 1) to exclude middle-click pan interactions.
+ * 
+ * Fires shapeDragMove CustomEvent with detail: { item, x, y, pageX, pageY } for Vue components.
+ * 
+ * @param {object} shape - Raphael shape set with items[], paper, connections[]
+ * @returns {void}
+ */
+const dragify = (shape: { paper: any; items: any[]; connections: any[]; }) => {
   const r = shape.paper;
-  shape.items.forEach((item) => {
+  shape.items.forEach((item: { set: { ox: number; oy: number; translate: (arg0: number, arg1: number) => void; }; type: string; node: { style: { cursor: string; }; getBoundingClientRect: () => any; parentElement: { getBoundingClientRect: () => any; }; }; drag: (arg0: (dx: number, dy: number, x: number, y: number, e: MouseEvent) => void, arg1: (x: number, y: number, e: MouseEvent) => void, arg2: (e: MouseEvent) => void) => void; animate: (arg0: { "fill-opacity": number; }, arg1: number) => void; }) => {
     item.set = shape;
     if (item.type === 'text') {
       return
     }
     item.node.style.cursor = 'move';
     item.drag(
-      function dragMove(dx, dy, x, y, e) {
+      // DragMove
+      (dx: number, dy: number, x: number, y: number, e: MouseEvent) => {
         if (e.which === 1) {
-          dx = this.set.ox;
-          dy = this.set.oy;
-          this.set.translate(x - Math.round(dx), y - Math.round(dy));
-          shape.connections.forEach((connection) => {
-            connection.draw()
+          dx = item.set.ox;
+          dy = item.set.oy;
+          item.set.translate(x - Math.round(dx), y - Math.round(dy));
+          shape.connections.forEach((connection: { draw: () => void; }) => {
+            connection.draw();
           });
-          this.set.ox = x;
-          this.set.oy = y;
-          const shapeBounds = this.node.getBoundingClientRect();
-          const parentBounds = this.node.parentElement.getBoundingClientRect();
+          item.set.ox = x;
+          item.set.oy = y;
+          const shapeBounds = item.node.getBoundingClientRect();
+          const parentBounds = item.node.parentElement.getBoundingClientRect();
 
           const event = new CustomEvent('shapeDragMove', { detail: {
               item,
@@ -44,11 +65,12 @@ const dragify = (shape) => {
           window.dispatchEvent(event);
         }
       },
-      function dragEnter(x, y, e) {
+      // DragEnter
+       (x: number, y: number, e: MouseEvent) => {
         if (e.which === 1) {
-          this.set.ox = x;
-          this.set.oy = y;
-          this.animate({ 'fill-opacity': 0.2 }, 500);
+          item.set.ox = x;
+          item.set.oy = y;
+          item.animate({ 'fill-opacity': 0.2 }, 500);
           const event = new CustomEvent('shapeDragMove', { detail: {
               item,
             }
@@ -56,9 +78,10 @@ const dragify = (shape) => {
           window.dispatchEvent(event);
         }
       },
-      function dragOut(e) {
+      // DragOut
+      (e: MouseEvent) => {
         if (e.which === 1) {
-          this.animate({ 'fill-opacity': 0.0 }, 500);
+          item.animate({ 'fill-opacity': 0.0 }, 500);
           const event = new CustomEvent('shapeDragMove', { detail: {
               item,
             }
@@ -72,7 +95,27 @@ const dragify = (shape) => {
 export default class RaphaelRenderer extends Renderer {
   canvas: any;
   lineStyle: { stroke: string; 'stroke-width': string; };
-  constructor(element, graph, width, height) {
+  
+  /**
+   * RaphaelRenderer - SVG graph rendering using Raphael library
+   * 
+   * Renders Dracula graph nodes and edges as SVG elements using Raphael.
+   * Provides interactive features:
+   * - Draggable nodes with real-time edge re-routing (dragify)
+   * - Middle-mouse pan for canvas navigation (drag viewBox)
+   * - Shape caching to avoid re-rendering unchanged elements
+   * - Connection line updates as nodes move
+   * 
+   * Connection points calculated from 8 cardinal/intercardinal directions on each node bounding box.
+   * Raphael generates unique colors for each node automatically.
+   * 
+   * @extends Renderer
+   * @param {HTMLElement|string} element - DOM element or selector for canvas container
+   * @param {Dracula} graph - Graph data structure to render
+   * @param {number} width - Canvas width in pixels
+   * @param {number} height - Canvas height in pixels
+   */
+  constructor(element: HTMLElement | string, graph: Dracula, width: number, height: number) {
     super(element, graph, width, height)
     this.canvas = Raphael(this.element, this.width, this.height)
     this.lineStyle = {
@@ -126,16 +169,25 @@ export default class RaphaelRenderer extends Renderer {
       }
     });
   }
-  element(element: any, width: any, height: any): any {
-      throw new Error('Method not implemented.');
-  }
-  width(element: any, width: any, height: any): any {
-      throw new Error('Method not implemented.');
-  }
-  height(element: any, width: any, height: any): any {
-      throw new Error('Method not implemented.');
-  }
-  drawNode(node) {
+
+  override drawNode(node: DraculaNode) {
+    /**
+     * Renders a graph node as an SVG rectangle with Raphael
+     * 
+     * Creates or updates a node's SVG representation:
+     * - Draws rounded rectangle shape (150x80px with 10px corner radius)
+     * - Assigns unique color from Raphael's color generator
+     * - Sets fill opacity to 0 (transparent, with colored border)
+     * - Translates shape to node's computed position
+     * - Enables drag interactions via dragify() unless noDefaultDrag is set
+     * - Initializes connections array for edge re-routing during drag
+     * 
+     * Caches shape in node object to avoid re-rendering on subsequent calls.
+     * 
+     * @override
+     * @param {DraculaNode} node - Node to render with point[x,y] coordinates
+     * @returns {void}
+     */
     const color = Raphael.getColor()
     // TODO update / cache shape
     // if (node.shape) {
@@ -159,7 +211,21 @@ export default class RaphaelRenderer extends Renderer {
     }
   }
 
-  drawEdge(edge) {
+  override drawEdge(edge: DraculaEdge) {
+    /**
+     * Renders a connection line between two graph nodes using Raphael
+     * 
+     * Creates SVG Bezier curve connecting source and target node shapes.
+     * Automatically calculates optimal connection points on 8 cardinal/intercardinal positions
+     * on each node's bounding box to minimize line crossing.
+     * 
+     * Registers connections on both source and target shapes so edges are re-drawn
+     * when nodes are dragged (called from dragify event handler).
+     * 
+     * @override
+     * @param {DraculaEdge} edge - Edge with source/target DraculaNodes to connect
+     * @returns {void}
+     */
     if (!edge.shape) {
       edge.shape = this.canvas.connection(edge.source.shape, edge.target.shape, edge.style)
       // edge.shape.line.attr(this.lineStyle)
@@ -172,7 +238,7 @@ export default class RaphaelRenderer extends Renderer {
 // <Raphael.fn.connection>
 
 /* coordinates for potential connection coordinates from/to the objects */
-const getConnectionPoints = (obj1, obj2) => {
+const getConnectionPoints = (obj1: { getBBox: () => any; }, obj2: { getBBox: () => any; }): {x: number, y: number}[] => {
   /* get bounding boxes of target and source */
   const bb1 = obj1.getBBox()
   const bb2 = obj2.getBBox()
@@ -209,7 +275,7 @@ const getConnectionPoints = (obj1, obj2) => {
   ]
 }
 
-Raphael.fn.connection = function Connection(obj1, obj2, style) {
+Raphael.fn.connection = function Connection(obj1: any, obj2: any, style: { [x: string]: any; directed: any; stroke: any; fill: string; label: any; callback: (arg0: { fg?: any; bg?: any; label?: any; draw(): void; }) => void; }) {
   const self = this
 
   /* create and return new connection */
@@ -274,7 +340,7 @@ Raphael.fn.connection = function Connection(obj1, obj2, style) {
         // magnitude, length of the last path vector
         const mag = Math.sqrt((y4 - y3) * (y4 - y3) + (x4 - x3) * (x4 - x3));
         // vector normalisation to specified length
-        const norm = (x, l) => -x * (l || 5) / mag
+        const norm = (x: number, l: null) => -x * (l || 5) / mag
         // calculate array coordinates (two lines orthogonal to the path vector)
         const arc = [{
           x: (norm(x4 - x3, null) + norm(y4 - y3, null) + x4).toFixed(3),

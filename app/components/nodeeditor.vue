@@ -1,3 +1,19 @@
+<!--
+  NodeEditor Component
+  
+  Transaction builder and mining controls for the currently selected network node.
+  Allows users to:
+  - Create and broadcast transactions between nodes with specified amounts
+  - Mine pending transactions into a new block
+  - Validate the entire blockchain ledger
+  
+  Props:
+  - nodes: Array of node objects containing systemNode, optional DOM element and graph reference
+  - selectedNodeId: ID of the currently selected node (updates controls visibility)
+  
+  Event Flow: User creates tx → orderTransaction() → broadcasts to peer nodes → animations
+  Mining Flow: User clicks Mine → minePendingTransactions() → startMining() → PoW computation
+-->
 <template>
   <div class="sml-node-editor">
     <div class="sml-node-editor__control" v-if="selectedNode"><h4 class="font-bold text-lg">Add Transaction</h4>
@@ -55,6 +71,15 @@ function getCurrentNode() {
   return props.nodes.find(node => node.systemNode.id === props.selectedNodeId);
 }
 
+/**
+ * Creates and broadcasts a transaction between two nodes
+ * 
+ * Validates both sender and receiver are selected with amount > 0.
+ * Calls orderTransaction() on the sender node to create signed transaction.
+ * Transaction propagates to all connected peers via the event system.
+ * 
+ * @returns {void}
+ */
 function orderTransaction() {
   if (fromNode.value && toNode.value && txAmount.value > 0) {
     selectedNode.value.systemNode.orderTransaction(
@@ -66,10 +91,33 @@ function orderTransaction() {
   }
 }
 
+/**
+ * Initiates proof-of-work mining on the selected node
+ * 
+ * Starts mining process for all pending transactions.
+ * Mining runs in a Web Worker to prevent UI blocking.
+ * Completes when nonce found that satisfies difficulty target.
+ * New block added to blockchain and broadcast to all peers.
+ * 
+ * @returns {void}
+ */
 function minePendingTransactions() {
   selectedNode.value.systemNode.startMining();
 }
 
+/**
+ * Validates the integrity of the selected node's blockchain
+ * 
+ * Verifies all blocks and transactions in the chain:
+ * - Each block's hash matches its content (tamper-detection)
+ * - previousHash links form unbroken chain
+ * - All transaction signatures are valid
+ * - Block rewards properly assigned
+ * 
+ * Logs validation result to browser console.
+ * 
+ * @returns {void}
+ */
 function validateChain() {
   console.log(selectedNode.value.systemNode.blockchain);
   selectedNode.value.systemNode.blockchain.isChainValid();

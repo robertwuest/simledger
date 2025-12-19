@@ -102,12 +102,20 @@ onMounted(async () => {
   }, 1);
 });
 
+/**
+ * Closes all open context menus for node connections
+ * Prevents menu overlap when clicking elsewhere on canvas
+ */
 function closeAllContextMenus() {
   props.nodes.forEach((node: any) => {
     node.element.querySelector('.sml-graph-viewer__node-connector').classList.remove('open');
   });
 }
 
+/**
+ * Handles canvas resize by updating SVG dimensions and viewBox
+ * Maintains responsive layout when container size changes
+ */
 function onResize() {
   const element = graphViewer.value as HTMLDivElement;
   const svg = element.querySelector('svg') as SVGElement;
@@ -118,6 +126,11 @@ function onResize() {
   svg.setAttribute('viewBox', viewBox.join(' '));
 }
 
+/**
+ * Adds a new node to the graph visualization
+ * @param {string} nodeId - The node's unique identifier
+ * @returns {DraculaNode} The created graph node object with shape and click handler
+ */
 function addNode(nodeId: string) {
   const graphNode = visualGraph.value.addNode(nodeId);
   setTimeout(() => {
@@ -128,15 +141,33 @@ function addNode(nodeId: string) {
   return graphNode;
 }
 
+/**
+ * Creates a directed edge between two nodes
+ * Edge color adapts to dark/light mode for optimal visibility
+ * @param {string} nodeAId - Source node ID
+ * @param {string} nodeBId - Target node ID
+ */
 function connectNodes(nodeAId: string, nodeBId: string) {
   const edgeColor = browserDarkMode ? 'whitesmoke' : '#1c2f21';
   visualGraph.value.addEdge(nodeAId, nodeBId, { style: { stroke: edgeColor } });
 }
 
+/**
+ * Removes an edge between two nodes from the visualization
+ * @param {string} nodeAId - Source node ID
+ * @param {string} nodeBId - Target node ID
+ */
 function disconnectNodes(nodeAId: string, nodeBId: string) {
   visualGraph.value.removeEdge(nodeAId, nodeBId);
 }
 
+/**
+ * Toggles network connection between two nodes
+ * Bidirectional: connects both nodes to each other
+ * Updates both system nodes and the visualization graph
+ * @param {SystemNode} nodeA - First network node
+ * @param {SystemNode} nodeB - Second network node
+ */
 function connectDisconnectNodes(nodeA: any, nodeB: any) {
   if (nodeA.connectedNodes.find((nd: any) => nd.node.id === nodeB.id)) {
     nodeA.forgetNode(nodeB.id);
@@ -150,6 +181,15 @@ function connectDisconnectNodes(nodeA: any, nodeB: any) {
   renderer.value.draw();
 }
 
+/**
+ * Animates content (transaction/block) flowing along a network edge
+ * Uses GSAP MotionPath to smoothly traverse the SVG edge path over 2 seconds
+ * Direction determined by whether sourceId matches the edge's source node
+ * @param {string} content - HTML content to animate
+ * @param {string} cssClass - CSS class for styling the animated element
+ * @param {string} sourceId - Source node ID (determines animation direction)
+ * @param {DraculaEdge} edge - The edge path to animate along
+ */
 function animateBroadcast(content: string, cssClass: string, sourceId: string, edge: any) {
   const element = document.createElement('div');
   const gsapAnimationObject = {

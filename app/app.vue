@@ -1,4 +1,18 @@
 <script setup lang="ts">
+/**
+ * App.vue - Root application component
+ * 
+ * SimLedger main entry point that:
+ * 1. Initializes the blockchain simulation with 5 demo nodes (Bob, Alice, Frank, Grace, Dave)
+ * 2. Creates a peer-to-peer network topology connecting the nodes
+ * 3. Seeds the genesis account with initial balance (100 coins to Bob)
+ * 4. Renders the Dashboard component for interactive visualization and testing
+ * 
+ * Architecture:
+ * - Wraps Dashboard component which manages GraphViewer, NodeExplorer, NodeEditor
+ * - Demonstrates cryptocurrency transfer from hardcoded genesis account
+ * - Network forms a connected topology: Bob-Alice-Frank-Grace, Alice-Grace (cross-link)
+ */
 
 import type { SystemNode } from '~~/src/network/system_node';
 import Dashboard from './components/dashboard.vue';
