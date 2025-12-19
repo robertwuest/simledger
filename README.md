@@ -1,5 +1,9 @@
 # SimLedger - Blockchain Simulation & Visualization
 
+<div align="center">
+  <img src="./design/logo.png" alt="SimLedger Logo" />
+</div>
+
 A Vue 3 + Nuxt 4 + TypeScript application for simulating and visualizing blockchain networks with an interactive graph-based node editor.
 
 ## Overview
@@ -17,11 +21,15 @@ A Vue 3 + Nuxt 4 + TypeScript application for simulating and visualizing blockch
 simledger/
 ├── app/                          # Vue 3 frontend application
 │   ├── app.vue                   # Root component
-│   └── components/               # Vue components
-│       ├── dashboard.vue         # Main dashboard layout
-│       ├── graphviewer.vue       # Network graph visualization
-│       ├── nodeexplorer.vue      # Node information panel
-│       └── nodeeditor.vue        # Node editing interface
+│   ├── components/               # Vue components
+│   │   ├── dashboard.vue         # Main dashboard layout
+│   │   ├── graphviewer.vue       # Network graph visualization
+│   │   ├── nodeexplorer.vue      # Node information panel
+│   │   └── nodeeditor.vue        # Node editing interface
+│   ├── composables/              # Vue composables (auto-imported)
+│   │   └── useSceneSetup.ts      # Scene initialization logic
+│   └── config/                   # Scene configurations
+│       └── scenes.ts             # Scene presets and definitions
 ├── src/
 │   ├── blockchain/               # Blockchain core logic
 │   │   ├── blockchain.ts         # Main blockchain class
@@ -75,6 +83,12 @@ simledger/
 - Animated transaction flow between nodes
 - Node property inspector
 - Real-time state updates
+
+### Scene Configuration
+- Declarative scene definitions with TypeScript interfaces
+- Multiple pre-configured network presets (default, simple)
+- Easy-to-modify network topology and genesis settings
+- Vue composable pattern for scene initialization
 
 ## Setup
 
@@ -165,6 +179,13 @@ Uses the Dracula graph library with:
 - Multiple layout algorithms (Spring, OrderedTree, TournamentTree)
 - Raphael/SnapSVG rendering engines
 - Interactive node dragging and connection management
+
+### Scene Configuration
+Declarative scene setup using Vue composables:
+- **Scene Definitions** (`app/config/scenes.ts`): Define network topology, nodes, connections, and genesis transactions as configuration objects
+- **Scene Composable** (`app/composables/useSceneSetup.ts`): Handles scene initialization from configuration
+- **Presets**: Built-in scenes (default 5-node network, simple 3-node network)
+- Easy to create custom scenes by adding new configuration objects
 
 ## API Documentation
 

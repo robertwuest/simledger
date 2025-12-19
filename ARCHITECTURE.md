@@ -196,13 +196,38 @@ Dracula provides graph data structure and rendering:
 
 Vue 3 components for user interaction and dashboard.
 
+### Scene Configuration
+
+The application uses a declarative approach for scene setup:
+
+#### Scene Definitions (`app/config/scenes.ts`)
+- TypeScript interfaces for type-safe configuration:
+  - `NodeConfig` - Node ID and role (genesis, validator, user)
+  - `ConnectionConfig` - Bidirectional peer connections
+  - `GenesisConfig` - Initial transaction settings (private key, recipient, amount)
+  - `SceneConfig` - Complete scene definition with name, nodes, connections, and genesis
+- Pre-configured scenes:
+  - `defaultScene` - 5-node network (Bob, Alice, Frank, Grace, Dave) with interconnected topology
+  - `simpleScene` - 3-node network (Alice, Bob, Charlie) for testing
+- Easily extensible: add custom scenes by creating new `SceneConfig` objects
+
+#### Scene Setup Composable (`app/composables/useSceneSetup.ts`)
+- Vue composable following Nuxt auto-import conventions
+- `initializeScene(config, dashboard)` - Main initialization function
+  - Creates all nodes from configuration
+  - Establishes peer connections bidirectionally
+  - Sets up genesis transaction with 1-second delay
+  - Returns node map for programmatic access
+- `setupGenesis()` - Private helper that handles initial coin distribution
+- Error handling for missing nodes or invalid connections
+
 ### Main Components
 
 #### App (`app/app.vue`)
 - Root component
-- Initializes demo network (Bob, Alice, Frank, Grace, Dave)
-- Creates initial connections
-- Demonstrates genesis transaction
+- Uses `useSceneSetup` composable for declarative scene initialization
+- Loads `defaultScene` from `app/config/scenes.ts`
+- Clean separation: configuration in config/, logic in composables/, UI in components/
 
 #### Dashboard (`app/components/dashboard.vue`)
 - Main layout with split panes
