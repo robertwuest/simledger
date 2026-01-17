@@ -1,8 +1,10 @@
 # SimLedger - Blockchain Simulation & Visualization
 
 <div align="center">
-  <img src="./design/logo.png" alt="SimLedger Logo" />
+  <img src="./public/img/logo.png" alt="SimLedger Logo" />
 </div>
+
+**Version**: 0.1.0-alpha.1
 
 A Vue 3 + Nuxt 4 + TypeScript application for simulating and visualizing blockchain networks with an interactive graph-based node editor.
 

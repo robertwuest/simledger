@@ -12,9 +12,11 @@
 
 import type { SystemNode } from '~~/src/network/system_node';
 import Dashboard from './components/dashboard.vue';
+import InfoPopup from './components/infopopup.vue';
 import { defaultScene } from '~/config/scenes';
 
 const dashboard = ref();
+const infoPopup = ref();
 const nodes = ref<{ systemNode: SystemNode; element?: HTMLDivElement | null; graphRef?: any }[]>([]);
 const { initializeScene } = useSceneSetup();
 
@@ -30,8 +32,24 @@ async function onDashboardReady() {
 	 text-align: center;
    background-color: var(--ui-bg-muted);
    display: flex;
+   flex-direction: column;
    height: 100vh;
 }
+
+.sml-app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 15px;
+  background-color: var(--ui-bg-elevated);
+  border-bottom: 1px solid var(--ui-bg-accented);
+  gap: 10px;
+}
+
+.sml-app-header__spacer {
+  flex-grow: 1;
+}
+
  #nav {
 	 padding: 30px;
 }
@@ -47,6 +65,10 @@ async function onDashboardReady() {
 
 <template>
   <UApp>
+    <div class="sml-app-header">
+      <img src="/img/logo132.png" alt="SimLedger Logo" />
+     <InfoPopup ref="infoPopup" />
+    </div>
     <Dashboard ref="dashboard" :nodes="nodes" @dashboard-ready="onDashboardReady"/>
   </UApp>
 </template>
