@@ -20,5 +20,8 @@ export default defineNuxtConfig({
         neutral: 'stone'    // replaces old "gray"
       }
     }
+  },
+  app: {
+    baseURL: process.env.NUXT_APP_BASE_URL || '/',
   }
 })
