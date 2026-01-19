@@ -1,5 +1,5 @@
 import elliptic from 'elliptic';
-const EC = elliptic.ec;
+const { ec: EC } = elliptic;
 import base58 from 'bs58';
 
 /**
