@@ -1,4 +1,5 @@
-import { ec as EC } from 'elliptic';
+import elliptic from 'elliptic';
+const EC = elliptic.ec;
 import base58 from 'bs58';
 
 /**

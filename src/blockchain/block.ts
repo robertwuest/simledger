@@ -1,4 +1,4 @@
-import { SHA256 } from 'crypto-js';
+import SHA256 from 'crypto-js/sha256';
 import { Transaction } from './transaction'; // eslint-disable-line
 import { Blockchain } from './blockchain'; // eslint-disable-line
 
