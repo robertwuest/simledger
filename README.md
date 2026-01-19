@@ -162,6 +162,36 @@ yarn preview
 bun run preview
 ```
 
+## Static Site Generation
+
+Generate a static version of the application for deployment:
+
+```bash
+# npm
+npm run generate
+
+# pnpm
+pnpm generate
+
+# yarn
+yarn generate
+
+# bun
+bun run generate
+```
+
+The static files will be generated in `.output/public` and can be deployed to any static hosting service.
+
+## Deployment
+
+The application is automatically deployed to GitHub Pages when changes are pushed to the `main` branch. The deployment workflow:
+
+1. Builds the static site using `npm run generate`
+2. Uploads the generated files to GitHub Pages
+3. Makes the site available at `https://<username>.github.io/simledger/`
+
+To trigger a manual deployment, go to the Actions tab in GitHub and run the "Deploy to GitHub Pages" workflow.
+
 ## Core Concepts
 
 ### Blockchain Architecture

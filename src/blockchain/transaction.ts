@@ -1,4 +1,4 @@
-import { SHA256 } from 'crypto-js';
+import SHA256 from 'crypto-js/sha256';
 import SmlCommon from '../common';
 import { Blockchain } from "./blockchain"; // eslint-disable-line
 
