@@ -25,15 +25,24 @@
   <splitpanes class="default-theme" horizontal
               @resize="resizePane($event)"
               @resized="paneResized($event)">
-    <pane size="65" class="sml-dashboard__container">
+    <pane size="65">
+                    <splitpanes class="default-theme" vertical>
+    <pane size="75" class="sml-dashboard__container">
+
         <div class="sml-dashboard__heading">Graph Viewer</div>
         <GraphViewer ref="graphViewer" :selectedNodeId="selectedNodeId" :nodes="nodes" @node-clicked="onGraphNodeClicked"  @graph-ready="onGraphReady"></GraphViewer>
+    </pane>
+    <pane class="sml-dashboard__container">
+                <div class="sml-dashboard__heading">Explorer</div>
+          <NodeExplorer ref="nodeExplorer" :nodes="nodes" @node-changed="onExplorerNodeChanged"></NodeExplorer>
+    </pane>
+    </splitpanes>
     </pane>
     <pane>
       <splitpanes class="default-theme" vertical>
         <pane class="sml-dashboard__container">
-          <div class="sml-dashboard__heading">Explorer</div>
-          <NodeExplorer ref="nodeExplorer" :nodes="nodes" @node-changed="onExplorerNodeChanged"></NodeExplorer>
+          <div class="sml-dashboard__heading">Console</div>
+          <LogConsole :nodes="nodes" />
         </pane>
         <pane class="sml-dashboard__container">
           <div class="sml-dashboard__heading">Editor</div>
@@ -55,6 +64,7 @@ import { SystemNode } from '~~/src/network/system_node';
 import GraphViewer from './graphviewer.vue';
 import NodeExplorer from './nodeexplorer.vue';
 import NodeEditor from './nodeeditor.vue';
+import LogConsole from './logconsole.vue';
 import { System } from '~~/src/network/system';
 
 gsap.registerPlugin(MotionPathPlugin);

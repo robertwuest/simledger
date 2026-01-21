@@ -19,19 +19,18 @@
     <div class="sml-node-editor__control" v-if="selectedNode"><h4 class="font-bold text-lg">Add Transaction</h4>
       <div class="sml-node-editor__tx">
         <div class="tx__connect">
-          <UBadge color="neutral" trailing-icon="i-lucide-arrow-right-from-line" size="lg">From</UBadge>
-          <USelect v-model="fromNode" :items="getNodes" class="w-48" placeholder="Select node" />
-          <UBadge color="neutral" trailing-icon="i-lucide-arrow-right-to-line" size="lg">To</UBadge>
-          <USelect v-model="toNode" :items="getNodes" class="w-48" placeholder="Select node" />
+          <UFormField label="From" ><USelect v-model="fromNode" :items="getNodes" class="w-48" placeholder="Select node" icon="i-lucide-arrow-right-from-line" /></UFormField>
+          <UFormField label="To" ><USelect v-model="toNode" :items="getNodes" class="w-48" placeholder="Select node" icon="i-lucide-arrow-right-to-line" /></UFormField>
         </div>
-      <div class="tx__amount"><UBadge color="neutral" trailing-icon="i-lucide-banknote" size="lg">Amount</UBadge><UInputNumber v-model="txAmount" :step="10" /></div>
-              <UButton v-on:click="orderTransaction()">Add Transaction</UButton>
+        <div class="tx__amount"><UFormField label="Amount" ><UInputNumber v-model="txAmount" :step="10"/></UFormField>
+        </div>
+        <UButton class="max-h-fit" icon="i-lucide-circle-plus" v-on:click="orderTransaction()">Add</UButton>
       </div>
     </div>
     <div class="sml-node-editor__control" v-if="selectedNode"><h4 class="font-bold text-lg">Controls</h4>
       <div class="sml-node-editor__tx">
-      <UButton v-on:click="minePendingTransactions()">Mine New Block</UButton>
-      <UButton v-on:click="validateChain()">Validate current chain</UButton>
+      <UButton icon="i-lucide-pickaxe" v-on:click="minePendingTransactions()">Mine New Block</UButton>
+      <UButton icon="i-lucide-ticket-check" v-on:click="validateChain()">Validate current chain</UButton>
       </div>
     </div>
   </div>
@@ -139,14 +138,15 @@ function validateChain() {
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
+    align-items: end;
+    background: var(--ui-bg-elevated);
+    border-radius: 4px;
   }
   .sml-node-editor__tx .tx__connect, .sml-node-editor__tx .tx__amount {
     display: flex;
     gap: 8px;
   }
-  .sml-node-editor__tx .tx__amount {
-    width: 30%;
-  }
+
   .sml-node-editor__tx .tx__amount input[type="number"] {
     width: 100%;
     margin-left: 8px;

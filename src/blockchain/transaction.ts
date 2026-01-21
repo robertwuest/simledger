@@ -109,13 +109,13 @@ export class Transaction {
 
     // Check sender and recipient
     if (self.fromAddress === self.toAddress) {
-      blockchain.log('warn', '%cTX: Sender address is same as receiver', 'color: #F0F');
+      blockchain.log('warn', '%c⇄: Sender address is same as receiver', 'color: #F0F');
       return false;
     }
 
     // check signature
     if (!self.signature || self.signature.length === 0) {
-      blockchain.log('warn', '%cTX: No signature found in this transaction', 'color: #F0F');
+      blockchain.log('warn', '%c⇄: No signature found in this transaction', 'color: #F0F');
       return false;
     }
 
@@ -123,7 +123,7 @@ export class Transaction {
     const verified = publicKey.verify(Transaction.generateHash(self), self.signature);
 
     if (!verified) {
-      blockchain.log('warn', '%cTX: Signature did not verify', 'color: #F0F');
+      blockchain.log('warn', '%c⇄: Signature did not verify', 'color: #F0F');
     }
 
     return verified;

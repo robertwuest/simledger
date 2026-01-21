@@ -181,27 +181,27 @@ export class Blockchain {
    */
   addBlock(block: Block) {
     if (block.hash === this.getLatestBlock().hash) {
-      this.log('log', '%cBC: Block already known', 'color: #0FF');
+      this.log('log', '%c🔗: Block already known', 'color: #0FF');
       return false;
     }
     if (block.length !== this.getBlockchainLength() + 1) {
-      this.log('warn', '%cBC: Block denotes invalid chain length', 'color: #0FF');
+      this.log('warn', '%c🔗: Block denotes invalid chain length', 'color: #0FF');
       return false;
     }
     if (block.hash !== Block.generateHash(block)) {
-      this.log('warn', '%cBC: Block hash invalid');
+      this.log('warn', '%c🔗: Block hash invalid');
       return false;
     }
     if (block.previousHash !== this.getLatestBlock().hash) {
-      this.log('warn', '%cBC: Block has invalid previous hash', 'color: #0FF');
+      this.log('warn', '%c🔗: Block has invalid previous hash', 'color: #0FF');
       return false;
     }
     if (!Block.hasValidTransactions(block, this)) {
-      this.log('warn', '%cBC: Block has invalid transactions', 'color: #0FF');
+      this.log('warn', '%c🔗: Block has invalid transactions', 'color: #0FF');
       return false;
     }
     if (!block.hash.substring(0, this.difficulty).split('').every(val => val === '0')) {
-      this.log('warn', '%cBC: Block hash doesnt meet difficulty', 'color: #0FF');
+      this.log('warn', '%c🔗: Block hash doesn\'t meet difficulty', 'color: #0FF');
       return false;
     }
     // add valid block to chain
@@ -236,28 +236,28 @@ export class Blockchain {
       // Recalculate the hash of the block and see if it matches up.
       // This allows us to detect changes to a single block
       if (currentBlock.hash !== Block.generateHash(currentBlock)) {
-        this.log('warn', `%c Chain invalid: Invalid hash at block length: ${currentBlock.length}`, 'background: #44FF44; color: #000');
+        this.log('warn', `%c✗ Chain invalid: Invalid hash at block length: ${currentBlock.length}`, 'background: #44FF44; color: #000');
         return false;
       }
 
       // Check if this block actually points to the previous block (hash)
       if (currentBlock.previousHash !== previousBlock.hash) {
-        this.log('warn', `%c Chain invalid: Invalid previous hash at block length: ${currentBlock.length}`, 'background: #44FF44; color: #000');
+        this.log('warn', `%c✗ Chain invalid: Invalid previous hash at block length: ${currentBlock.length}`, 'background: #44FF44; color: #000');
         return false;
       }
 
       if (!Block.hasValidTransactions(currentBlock, this)) {
-        this.log('warn', `%c Chain invalid: Invalid transactions at block length: ${currentBlock.length}`, 'background: #44FF44; color: #000');
+        this.log('warn', `%c✗ Chain invalid: Invalid transactions at block length: ${currentBlock.length}`, 'background: #44FF44; color: #000');
         return false;
       }
     }
     // Check the genesis block
     if (this.chain[0].hash !== Block.generateHash(this.createGenesisBlock())) {
-      this.log('warn', '%c Chain invalid: Genesis block invalid', 'background: #44FF44; color: #000');
+      this.log('warn', '%c✗ Chain invalid: Genesis block invalid', 'background: #44FF44; color: #000');
       return false;
     }
     // If we managed to get here, the chain is valid!
-    this.log('log', '%c Chain is valid!', 'background: #00EE00; color: #000');
+    this.log('log', '%c✓ Chain is valid!', 'background: #00EE00; color: #000');
     return true;
   }
 
@@ -279,18 +279,18 @@ export class Blockchain {
   addTransaction(transaction: Transaction) {
     if (!transaction.fromAddress || !transaction.toAddress) {
       console.log(transaction);
-      this.log('warn', '%cTX: Transaction must include from and to address', 'color: #FF0');
+      this.log('warn', '%c⇄: Transaction must include from and to address', 'color: #FF0');
       return false;
     }
 
     if (this.pendingTransactions.find(tx => Transaction.generateHash(transaction) === Transaction.generateHash(tx))) {
-      this.log('log', '%cTX: Transaction already known, do nothing', 'color: #FF0');
+      this.log('log', '%c⇄: Transaction already known, do nothing', 'color: #FF0');
       return false;
     }
 
     if (!Transaction.isValid(transaction, this)) {
       console.log(transaction);
-      this.log('warn', '%cTX: Cannot add invalid transaction to chain', 'color: #FF0');
+      this.log('warn', '%c⇄: Cannot add invalid transaction to chain', 'color: #FF0');
       return false;
     }
 
@@ -304,19 +304,19 @@ export class Blockchain {
 
     if (transaction.fromAddress !== '_' && pendingAmount - transaction.amount < 0.0) {
       console.log(transaction);
-      this.log('warn', '%cTX: Transaction overspend from sender', 'color: #FF0');
+      this.log('warn', '%c⇄: Transaction overspend from sender', 'color: #FF0');
       return false;
     }
 
     if (transaction.fromAddress === '_') {
       if (transaction.amount !== this.miningReward) {
         console.log(transaction);
-        this.log('warn', '%cTX: Invalid reward', 'color: #FF0');
+        this.log('warn', '%c⇄: Invalid reward', 'color: #FF0');
         return false;
       }
       if (this.pendingTransactions.find(tx => tx.fromAddress)) {
         console.log(transaction);
-        this.log('warn', '%cTX: Duplicated reward transaction', 'color: #FF0');
+        this.log('warn', '%c⇄: Duplicated reward transaction', 'color: #FF0');
         return false;
       }
     }

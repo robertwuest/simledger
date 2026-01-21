@@ -20,7 +20,7 @@
 -->
 <template>
   <div class="sml-node-explorer">
-    <USelect v-model="selectedNode" :items="getNodes" class="w-48" placeholder="Select node" />
+    <USelect v-model="selectedNode" :items="getNodes" class="w-48" placeholder="Select node" icon="i-lucide-workflow" />
     <div v-if="selectedNode" class="sml-node-explorer__ledger">
       <h4>Ledger</h4>
       <ul v-for="block in selectedNode.blockchain.chain" :key="block.hash">
