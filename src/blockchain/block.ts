@@ -152,7 +152,7 @@ export class Block {
       if (tx.fromAddress === '_') {
         if (hasRewardTransaction) {
           // reject another reward transaction
-          blockchain.log('warn', '%cBlock: More than one reward transaction found', 'color: #F0F');
+          blockchain.log('warn', '%c📦 More than one reward transaction found', 'color: #F0F');
           return false;
         }
         hasRewardTransaction = true;
@@ -162,7 +162,7 @@ export class Block {
           continue;
         } else {
           // fraudulent reward address or invalid mining reward
-          blockchain.log('warn', `%cBlock: Fraudulent reward address or invalid mining reward to recipient: ${tx.fromAddress}`, 'color: #F0F');
+          blockchain.log('warn', `%c📦: Fraudulent reward address or invalid mining reward to recipient: ${tx.fromAddress}`, 'color: #F0F');
           return false;
         }
       } else {
@@ -170,7 +170,7 @@ export class Block {
       }
 
       if (!Transaction.isValid(tx, blockchain)) {
-        blockchain.log('warn', `%cBlock: Transaction invalid or cannot verify signature: ${tx.fromAddress}`, 'color: #F0F');
+        blockchain.log('warn', `%c📦: Transaction invalid or cannot verify signature: ${tx.fromAddress}`, 'color: #F0F');
         // signature check failed
         return false;
       }
@@ -179,17 +179,17 @@ export class Block {
         balances.set(tx.fromAddress, blockchain.getBalanceOfAddress(tx.fromAddress, self.length - 2));
       }
       if (balances.get(tx.fromAddress) - tx.amount < 0.0) {
-        blockchain.log('warn', `%cBlock: Overspend from address: ${tx.fromAddress}`, 'color: #F0F');
+        blockchain.log('warn', `%c📦: Overspend from address: ${tx.fromAddress}`, 'color: #F0F');
         return false;
       }
       balances.set(tx.fromAddress, balances.get(tx.fromAddress) - tx.amount);
     }
     if (!hasRewardTransaction && blockchain.getLatestBlock().previousHash !== 'genesisHash') {
-      blockchain.log('warn', '%cBlock: No reward transaction found', 'color: #F0F');
+      blockchain.log('warn', '%c📦: No reward transaction found', 'color: #F0F');
       return false;
     }
     if (!hasTransactions) {
-      blockchain.log('warn', '%cBlock: No transaction found', 'color: #F80');
+      blockchain.log('warn', '%c📦: No transaction found', 'color: #F80');
       return false;
     }
     return true;
