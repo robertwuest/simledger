@@ -201,7 +201,7 @@ export class Blockchain {
       return false;
     }
     if (!block.hash.substring(0, this.difficulty).split('').every(val => val === '0')) {
-      this.log('warn', '%c🔗: Block hash doesnt meet difficulty', 'color: #0FF');
+      this.log('warn', '%c🔗: Block hash doesn\'t meet difficulty', 'color: #0FF');
       return false;
     }
     // add valid block to chain
