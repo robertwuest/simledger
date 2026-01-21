@@ -152,7 +152,7 @@ export class Block {
       if (tx.fromAddress === '_') {
         if (hasRewardTransaction) {
           // reject another reward transaction
-          blockchain.log('warn', '%c📦 More than one reward transaction found', 'color: #F0F');
+          blockchain.log('warn', '%c📦: More than one reward transaction found', 'color: #F0F');
           return false;
         }
         hasRewardTransaction = true;
