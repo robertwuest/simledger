@@ -4,19 +4,19 @@ import { Blockchain } from './blockchain'; // eslint-disable-line
 
 /**
  * Class representing a block within the blockchain
- * 
+ *
  * A block is an immutable record containing:
  * - A timestamp of when it was created
  * - A list of transactions
  * - A reference to the previous block (previousHash)
  * - A nonce for proof-of-work mining
  * - The miner's reward address
- * 
+ *
  * The block's hash is derived from all its contents, making it tamper-evident.
  * If any data in the block changes, the hash will no longer match the stored value.
- * 
+ *
  * This code is based on the original implementations by Xavier Decuyper https://www.codementor.io/@savjee
- * 
+ *
  * @class Block
  * @property {string} previousHash - Hash of the previous block in the chain
  * @property {string} timestamp - Creation time as a string timestamp
@@ -39,7 +39,7 @@ export class Block {
 
   /**
    * Creates a new Block instance
-   * 
+   *
    * @param {number} length - Position of this block in the chain
    * @param {string} timestamp - Creation timestamp
    * @param {Transaction[]} transactions - Transactions to include in this block
@@ -62,75 +62,105 @@ export class Block {
     this.nonce = 0;
     this.rewardAddress = rewardAddress;
     this.previousRewardAddress = previousRewardAddress;
-    this.hash = Block.generateHash(this);
+    this.hash = this.generateHash();
   }
 
   /**
-   * Generates the SHA256 hash for a block
-   * 
-   * The hash is computed from all block data concatenated together:
-   * previousHash + length + timestamp + transactions + rewardAddress + nonce
-   * 
+   * Generates the SHA256 hash for this block using transaction hashes
+   *
+   * The hash is computed from:
+   * - previousHash + length + timestamp + transactionHashes + rewardAddress + nonce
+   *
+   * Using transaction hashes instead of JSON.stringify ensures:
+   * - Deterministic ordering (same transactions = same hash)
+   * - Better performance (hashes pre-computed)
+   * - Consistency (block hash depends on transaction hashes)
+   *
    * This makes the block tamper-evident - any change invalidates the hash.
    * The nonce is included to support proof-of-work mining.
-   * 
-   * @static
-   * @param {Block} self - The block to hash
+   *
    * @returns {string} The SHA256 hash as a hex string
    */
-  static generateHash(self: Block) {
+  generateHash(): string {
+    const transactionHashes = this.transactions
+      .map(tx => tx.generateHash())
+      .join('');
+
     return SHA256(
-      self.previousHash +
-      self.length +
-      self.timestamp +
-      JSON.stringify(self.transactions) +
-      self.rewardAddress +
-      self.nonce,
+      this.previousHash +
+      this.length +
+      this.timestamp +
+      transactionHashes +
+      this.rewardAddress +
+      this.nonce,
     ).toString();
   }
 
   /**
    * Mines the block by finding a valid proof-of-work nonce
-   * 
+   *
    * Proof-of-work mechanism: incrementally increase the nonce until the block's hash
    * has the required number of leading zeros (specified by difficulty parameter).
-   * 
+   *
    * For example, difficulty=1 requires 1 leading zero (hash starts with '0'),
    * difficulty=2 requires 2 leading zeros, etc.
-   * 
+   *
    * Mining is performed in a Web Worker to prevent blocking the UI thread.
    * Sends the block data to the worker and listens for completion.
-   * 
-   * @static
-   * @param {Block} self - The block to mine
+   *
    * @param {number} difficulty - Number of leading zeros required in the hash
    * @param {Function} callback - Called with mined block data when complete
    */
-  static mineBlock(self: Block, difficulty: number, callback: any) {
+  mineBlock(difficulty: number, callback: (result: { nonce: number; hash: string } | null) => void): void {
     const worker = new Worker('js/mining.js');
+
+    // Set timeout to prevent infinite mining
+    const timeout = setTimeout(() => {
+      worker.terminate();
+      console.error('Mining timeout after 5 minutes');
+      callback(null);
+    }, 300000);
+
     // Only send serializable data
     worker.postMessage({
       block: {
-        previousHash: self.previousHash,
-        length: self.length,
-        timestamp: self.timestamp,
-        transactions: self.transactions.map(tx => ({ ...tx })),
-        rewardAddress: self.rewardAddress,
-        previousRewardAddress: self.previousRewardAddress,
-        nonce: self.nonce,
-        hash: self.hash
+        previousHash: this.previousHash,
+        length: this.length,
+        timestamp: this.timestamp,
+        transactions: this.transactions.map(tx => ({
+          fromAddress: tx.fromAddress,
+          toAddress: tx.toAddress,
+          amount: tx.amount,
+          nonce: tx.nonce,
+          signature: tx.signature,
+          timestamp: tx.timestamp,
+        })),
+        rewardAddress: this.rewardAddress,
+        previousRewardAddress: this.previousRewardAddress,
+        nonce: this.nonce,
+        hash: this.hash
       },
       difficulty,
     });
+
     worker.addEventListener('message', (e) => {
+      clearTimeout(timeout);
       console.log(`%cBlock mined: ${e.data.hash}`, 'color: #00FF00');
+      worker.terminate();
       callback(e.data);
+    });
+
+    worker.addEventListener('error', (error) => {
+      clearTimeout(timeout);
+      console.error('Mining worker error:', error);
+      worker.terminate();
+      callback(null);
     });
   }
 
   /**
-   * Validates all transactions within a block
-   * 
+   * Validates all transactions within this block
+   *
    * Comprehensive validation including:
    * - Exactly one reward transaction from the network ('_' fromAddress)
    * - Reward goes to the previous miner (previousRewardAddress)
@@ -138,52 +168,60 @@ export class Block {
    * - All regular transactions have valid signatures
    * - No address spends more than they have (prevents double-spending)
    * - At least one regular transaction exists (blocks can't be empty except genesis)
-   * 
-   * @static
-   * @param {Block} self - The block to validate
+   *
    * @param {Blockchain} blockchain - The blockchain for context (rewards, balances)
    * @returns {boolean} True if all transactions are valid, false otherwise
    */
-  static hasValidTransactions(self: Block, blockchain: Blockchain) {
-    const balances = new Map();
+  hasValidTransactions(blockchain: Blockchain): boolean {
+    const tempBalances = new Map<string, number>();
     let hasRewardTransaction = false;
     let hasTransactions = false;
-    for (const tx of self.transactions) {
+
+    for (const tx of this.transactions) {
       if (tx.fromAddress === '_') {
         if (hasRewardTransaction) {
-          // reject another reward transaction
           blockchain.log('warn', '%c📦: More than one reward transaction found', 'color: #F0F');
           return false;
         }
         hasRewardTransaction = true;
-        if (tx.toAddress === self.previousRewardAddress
+
+        if (tx.toAddress === this.previousRewardAddress
           && tx.amount === blockchain.miningReward) {
           // reward transaction valid
           continue;
         } else {
           // fraudulent reward address or invalid mining reward
-          blockchain.log('warn', `%c📦: Fraudulent reward address or invalid mining reward to recipient: ${tx.fromAddress}`, 'color: #F0F');
+          blockchain.log('warn', `%c📦: Fraudulent reward address or invalid mining reward to recipient: ${tx.toAddress}`, 'color: #F0F');
           return false;
         }
       } else {
         hasTransactions = true;
       }
 
-      if (!Transaction.isValid(tx, blockchain)) {
+      if (!tx.isValid(blockchain)) {
         blockchain.log('warn', `%c📦: Transaction invalid or cannot verify signature: ${tx.fromAddress}`, 'color: #F0F');
         // signature check failed
         return false;
       }
-      // prevent over spending
-      if (!balances.has(tx.fromAddress)) {
-        balances.set(tx.fromAddress, blockchain.getBalanceOfAddress(tx.fromAddress, self.length - 2));
+
+      // prevent over spending - O(1) with state manager
+      if (!tempBalances.has(tx.fromAddress)) {
+        // Get balance from previous block
+        const prevBlockIndex = this.length - 2;
+        const balance = prevBlockIndex >= 0
+          ? blockchain.getBalanceOfAddress(tx.fromAddress, prevBlockIndex)
+          : 0;
+        tempBalances.set(tx.fromAddress, balance);
       }
-      if (balances.get(tx.fromAddress) - tx.amount < 0.0) {
+
+      const currentBalance = tempBalances.get(tx.fromAddress)!;
+      if (currentBalance - tx.amount < 0.0) {
         blockchain.log('warn', `%c📦: Overspend from address: ${tx.fromAddress}`, 'color: #F0F');
         return false;
       }
-      balances.set(tx.fromAddress, balances.get(tx.fromAddress) - tx.amount);
+      tempBalances.set(tx.fromAddress, currentBalance - tx.amount);
     }
+
     if (!hasRewardTransaction && blockchain.getLatestBlock().previousHash !== 'genesisHash') {
       blockchain.log('warn', '%c📦: No reward transaction found', 'color: #F0F');
       return false;
