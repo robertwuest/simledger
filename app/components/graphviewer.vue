@@ -178,6 +178,10 @@ function connectDisconnectNodes(nodeA: any, nodeB: any) {
   if (nodeA.connectToNode(nodeB)) {
     connectNodes(nodeA.id, nodeB.id);
   }
+  redraw();
+}
+
+function redraw() {
   renderer.value.draw();
 }
 
@@ -221,6 +225,7 @@ defineExpose({
   connectDisconnectNodes,
   animateBroadcast,
   onResize,
+  redraw,
   closeAllContextMenus
 });
 </script>
