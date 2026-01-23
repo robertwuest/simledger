@@ -186,11 +186,13 @@ onBeforeUnmount(() => {
 
 /* Main container */
 .sml-console {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  height: calc(100% - 28px);
-  position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    height: calc(100% - 28px);
+    position: absolute;
+    width: 100%;
+    top: 28px;
 }
 
 /* Clear button in toolbar */

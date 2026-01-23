@@ -107,12 +107,13 @@ export class SystemNode {
    */
   orderTransaction(fromAddress: string, toAddress: string, amount: number, signingKey: any) {
     const tx = new Transaction(fromAddress, toAddress, amount);
-    Transaction.signTransaction(tx, signingKey);
-    this.blockchain.addTransaction(tx);
-    this.pushToTickQueue(() => {
-      this.broadcastTransaction.next({ tx, sender: this, referrer: this });
-      this.eventEmitter.next({ msg: SystemNode.events.BROADCAST_TX, referrer: this });
-    });
+    tx.signTransaction(signingKey);
+    if (this.blockchain.addTransaction(tx)) {
+      this.pushToTickQueue(() => {
+        this.broadcastTransaction.next({ tx, sender: this, referrer: this });
+        this.eventEmitter.next({ msg: SystemNode.events.BROADCAST_TX, referrer: this });
+      });
+    }
   }
 
   /**

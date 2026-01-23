@@ -26,7 +26,9 @@
               @resize="resizePane($event)"
               @resized="paneResized($event)">
     <pane size="65">
-                    <splitpanes class="default-theme" vertical>
+                    <splitpanes class="default-theme" vertical
+                    @resize="resizePane($event)"
+              @resized="paneResized($event)">
     <pane size="75" class="sml-dashboard__container">
 
         <div class="sml-dashboard__heading">Graph Viewer</div>
@@ -265,6 +267,7 @@ defineExpose({
   .sml-dashboard__container {
     display: flex;
     flex-direction: column;
+    position: relative;
   }
   .default-theme.splitpanes .splitpanes__pane {
     background-color: transparent;
