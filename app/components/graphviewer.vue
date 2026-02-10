@@ -10,7 +10,7 @@
           <div>Balance: {{ node.systemNode.getBalance() }}</div>
           <img class="sml-graph-viewer__node-process" :src="`/img/icons/gears.svg`" alt="" fill="#FF0000"/>
           <img class="sml-graph-viewer__node-pow-lottery" :src="`/img/icons/die${ node.systemNode.miningDelay + 1 }.svg`" alt=""/>
-          <div class="sml-graph-viewer__node-progress-bar"><span v-bind:style="{ width: `${ node.systemNode.getRemainingMiningDelayPercentage() }%` }"></span></div>
+          <div class="sml-graph-viewer__node-progress-bar"><span v-bind:style="{ width: node.systemNode.isMining ? '100%' : '0', transitionDuration: ((node.systemNode.miningDelay + 1)*2) + 's' }"></span></div>
           <img class="sml-graph-viewer__node-error" :src="`/icons/error.svg`" alt=""/>
           <div class="sml-graph-viewer__node-connector">
             <img class="connect" :src="`/img/icons/connect.svg`" alt="" v-on:click="$event.target.parentElement.classList.toggle('open'); $event.stopPropagation()"/>
@@ -331,7 +331,7 @@ defineExpose({
     }
   }
   .sml-graph-viewer__node-progress-bar {
-    display: none;
+    visibility: hidden;
     border: 1px solid white;
     border-radius: 6px;
     margin-top: 3px;
@@ -416,6 +416,7 @@ defineExpose({
   }
   .sml-graph-viewer__node--mining .sml-graph-viewer__node-pow-lottery, .sml-graph-viewer__node--mining .sml-graph-viewer__node-progress-bar {
     display: block;
+    visibility: visible;
   }
   .sml-graph-viewer__node--selected {
     box-shadow: 0 0 12px var(--shadow-color);
