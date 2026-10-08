@@ -33,6 +33,8 @@ export class Blockchain {
   genesisAddress: string;
   logSubscribers: Array<(type: string, message: string) => void> = [];
   private stateManager: AccountStateManager;
+  /** While > 0, log messages are suppressed (used for internal re-validation) */
+  private muted = 0;
 
   /**
    * Creates a new Blockchain instance with a genesis block
@@ -89,7 +91,8 @@ export class Blockchain {
     const block = new Block(
       this.chain.length + 1,
       SmlCommon.generateTimestamp(),
-      this.pendingTransactions,
+      // Copy: transactions arriving while mining must not alter the block being mined
+      [...this.pendingTransactions],
       miningRewardAddress,
       this.getLatestBlock().rewardAddress,
       this.getLatestBlock().hash
@@ -147,6 +150,101 @@ export class Blockchain {
       const lastBlock = this.getLatestBlock();
       this.stateManager.revertToBlock(lastBlock.hash);
     }
+  }
+
+  /**
+   * Finds the first position at which the given chain differs from this chain
+   *
+   * If one chain is a prefix of the other, the length of the shorter chain is returned.
+   * Both chains share all blocks before the returned index.
+   *
+   * @param {Block[]} blocks - The chain to compare with
+   * @returns {number} Index of the first diverging block
+   */
+  getForkIndex(blocks: Block[]): number {
+    const length = Math.min(this.chain.length, blocks.length);
+    for (let i = 0; i < length; i++) {
+      if (this.chain[i]!.hash !== blocks[i]!.hash) {
+        return i;
+      }
+    }
+    return length;
+  }
+
+  /**
+   * Replaces the chain with another chain (e.g. a peer's chain) after validating it
+   *
+   * The candidate chain is replayed block by block on a fresh blockchain, so every block
+   * passes the same checks as in addBlock(). Only if the whole chain is valid, the chain
+   * and the account state are swapped; otherwise this blockchain stays unchanged.
+   * Pending transactions are not touched, see restorePendingTransactions().
+   *
+   * @param {Block[]} blocks - The new chain including the genesis block
+   * @returns {Block[]|null} The blocks of the former chain that are no longer part of the
+   * chain (discarded fork), or null if the candidate chain is invalid
+   */
+  replaceChain(blocks: Block[]): Block[] | null {
+    const candidate = new Blockchain();
+    candidate.muted = 1;
+    candidate.difficulty = this.difficulty;
+    candidate.miningReward = this.miningReward;
+    if (!blocks.length || blocks[0]!.hash !== candidate.getLatestBlock().hash) {
+      return null;
+    }
+    for (let i = 1; i < blocks.length; i++) {
+      if (!candidate.addBlock(blocks[i]!)) {
+        return null;
+      }
+    }
+    const forkIndex = this.getForkIndex(blocks);
+    const discarded = this.chain.slice(forkIndex);
+    this.chain = candidate.chain;
+    this.stateManager = candidate.stateManager;
+    return discarded;
+  }
+
+  /**
+   * Rebuilds the pending transaction pool from a list of candidate transactions
+   *
+   * Used after the chain changed (new block or chain switch): candidates already included
+   * in the chain, duplicates and transactions that are no longer valid (e.g. now overspending)
+   * are dropped silently, the others are validated like in addTransaction().
+   * A mining reward for the miner of the latest block is created if no candidate provides it.
+   *
+   * @param {Transaction[]} candidates - Transactions to keep in the pool if still valid
+   * @returns {{ accepted: Transaction[], dropped: Transaction[] }} The resulting pool and the dropped candidates
+   */
+  restorePendingTransactions(candidates: Transaction[]): { accepted: Transaction[]; dropped: Transaction[] } {
+    const confirmed = new Set(this.chain.flatMap(block => block.transactions.map(tx => tx.generateHash())));
+    const rewardAddress = this.getLatestBlock().rewardAddress;
+    const seen = new Set<string>();
+    const dropped: Transaction[] = [];
+    this.pendingTransactions = [];
+    this.muted++;
+    try {
+      const rewards = candidates.filter(tx => tx.fromAddress === '_' && tx.toAddress === rewardAddress);
+      const reward = rewards.find(tx => !confirmed.has(tx.generateHash()))
+        ?? new Transaction('_', rewardAddress, this.miningReward);
+      this.addTransaction(reward);
+      seen.add(reward.generateHash());
+      candidates.forEach((tx) => {
+        const hash = tx.generateHash();
+        if (seen.has(hash)) {
+          return;
+        }
+        seen.add(hash);
+        // Rewards are only valid for the miner of the latest block, others belong to a former tip
+        if (tx.fromAddress === '_' || confirmed.has(hash)) {
+          return;
+        }
+        if (!this.addTransaction(tx)) {
+          dropped.push(tx);
+        }
+      });
+    } finally {
+      this.muted--;
+    }
+    return { accepted: [...this.pendingTransactions], dropped };
   }
 
   /**
@@ -373,6 +471,9 @@ export class Blockchain {
    * @param {any} [params] - Optional parameters for console formatting
    */
   log(type: string, message: string, params?: any) {
+    if (this.muted > 0) {
+      return;
+    }
     switch (type) {
       case 'warn':
         console.warn(message, params);

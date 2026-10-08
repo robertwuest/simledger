@@ -151,6 +151,53 @@ describe('createNetworkStore', () => {
     });
   });
 
+  describe('chain conflicts', () => {
+    /** Alice and Bob each mine a block on their own, then connect: equal-length fork */
+    async function fork() {
+      network.addNode('Alice');
+      network.addNode('Bob');
+      network.start();
+      fund('Alice', 'Alice', 10);
+      fund('Bob', 'Bob', 20);
+      network.startMining('Alice');
+      network.startMining('Bob');
+      await vi.advanceTimersByTimeAsync(8 * System.CycleTime);
+      network.connect('Alice', 'Bob');
+    }
+
+    it('exposes conflicts per node and per edge', async () => {
+      network.addNode('Carol');
+      await fork();
+      expect(network.getChainConflicts('Alice')).toEqual([{ peerId: 'Bob', forkIndex: 1, ownLength: 2, peerLength: 2, retained: false }]);
+      expect(network.getChainConflicts('Carol')).toEqual([]);
+      expect(network.getChainConflicts('Nobody')).toEqual([]);
+      expect(network.getNodeView('Alice')).toMatchObject({ chainLength: 2, openConflicts: 1 });
+      expect([...network.conflictEdgeIds.value]).toEqual(['Alice--Bob']);
+    });
+
+    it('keeps the edge marked until both nodes decided', async () => {
+      await fork();
+      expect(network.retainChain('Alice', 'Bob')).toBe(true);
+      expect(network.getNodeView('Alice')!.openConflicts).toBe(0);
+      expect(network.conflictEdgeIds.value.has('Alice--Bob')).toBe(true);
+      expect(network.retainChain('Bob', 'Alice')).toBe(true);
+      expect(network.conflictEdgeIds.value.size).toBe(0);
+    });
+
+    it('resolves the conflict by adopting the peer chain', async () => {
+      await fork();
+      const before = network.version.value;
+      expect(network.adoptChain('Bob', 'Alice')).toBe(true);
+      expect(network.version.value).toBeGreaterThan(before);
+      expect(network.getChainConflicts('Alice')).toEqual([]);
+      expect(network.getChainConflicts('Bob')).toEqual([]);
+      expect(network.conflictEdgeIds.value.size).toBe(0);
+      expect(network.adoptChain('Bob', 'Alice')).toBe(false);
+      expect(network.adoptChain('Nobody', 'Alice')).toBe(false);
+      expect(network.retainChain('Nobody', 'Alice')).toBe(false);
+    });
+  });
+
   describe('transactions', () => {
     beforeEach(() => {
       network.addNode('Alice');

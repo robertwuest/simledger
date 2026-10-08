@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h } from 'vue';
 import NetworkNode from '~/components/graph/NetworkNode.vue';
 import type { NetworkStore } from '~/composables/useNetwork';
@@ -14,7 +14,10 @@ describe('NetworkNode', () => {
     network = createTestNetwork(['Alice', 'Bob', 'Frank'], [['Alice', 'Bob']]);
   });
 
-  afterEach(() => network.dispose());
+  afterEach(() => {
+    network.dispose();
+    vi.restoreAllMocks();
+  });
 
   const mountNode = (id = 'Alice') => mountWithNetwork(NetworkNode, network, {
     props: { id },
@@ -98,5 +101,18 @@ describe('NetworkNode', () => {
   it('renders nothing for an unknown node', async () => {
     const wrapper = await mountNode('Nobody');
     expect(wrapper.find('[data-testid="network-node"]').exists()).toBe(false);
+  });
+  it('shows a fork icon while the chain conflicts with a peer', async () => {
+    const getChainConflicts = vi.spyOn(network.getNode('Alice')!, 'getChainConflicts')
+      .mockReturnValue([{ peerId: 'Bob', forkIndex: 1, ownLength: 2, peerLength: 2, retained: false }]);
+    const wrapper = await mountNode();
+    expect(wrapper.find('.sml-node--conflict').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="node-conflict"]').attributes('title')).toBe('Chain conflict with a peer, resolve it in the explorer');
+    expect(wrapper.find('[data-testid="network-node"]').attributes('aria-label')).toBe('Alice, balance 0, chain conflict');
+
+    getChainConflicts.mockReturnValue([{ peerId: 'Bob', forkIndex: 1, ownLength: 2, peerLength: 2, retained: true }]);
+    network.touch();
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('[data-testid="node-conflict"]').exists()).toBe(false);
   });
 });

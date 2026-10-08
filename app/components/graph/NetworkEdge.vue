@@ -4,9 +4,17 @@
   Custom Vue Flow edge for a (bidirectional) peer connection. The edge floats: it
   attaches to the border of both node cards at the point facing the other node.
   Packets broadcast along this connection are rendered on top of the edge.
+  The edge is dashed in the warning color while the two nodes have diverging chains.
 -->
 <template>
-  <BaseEdge :id="id" :path="path[0]" :style="style" :interaction-width="20" class="sml-edge" />
+  <BaseEdge
+    :id="id"
+    :path="path[0]"
+    :style="style"
+    :interaction-width="20"
+    class="sml-edge"
+    :class="{ 'sml-edge--conflict': conflict }"
+  />
   <path ref="pathEl" :d="path[0]" fill="none" stroke="none" class="sml-edge__track" />
   <EdgeLabelRenderer>
     <BroadcastPacket
@@ -38,7 +46,7 @@ const props = defineProps<{
   style?: CSSProperties;
 }>();
 
-const { animations } = useNetwork();
+const { animations, conflictEdgeIds } = useNetwork();
 const pathEl = ref<SVGPathElement | null>(null);
 
 function toRect(node: GraphNode): Rect {
@@ -62,6 +70,8 @@ const path = computed(() => {
   });
 });
 
+const conflict = computed(() => conflictEdgeIds.value.has(props.id));
+
 const packets = computed(() => animations.packetsFor(props.id));
 
 function getPath() {
@@ -70,6 +80,10 @@ function getPath() {
 </script>
 
 <style>
+.vue-flow__edge .vue-flow__edge-path.sml-edge--conflict {
+  stroke: var(--ui-warning);
+  stroke-dasharray: 6 4;
+}
 .vue-flow__edge.selected .sml-edge {
   stroke: var(--ui-primary) !important;
 }

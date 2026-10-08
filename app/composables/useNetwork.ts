@@ -5,6 +5,9 @@
  * simulation `System`, the `SystemNode` instances, the current selection and
  * the transient UI state (error flashes, broadcast animations).
  *
+ * Chain conflicts (connected nodes with diverging chains) are read from the nodes and
+ * resolved through `adoptChain()` / `retainChain()`.
+ *
  * The domain objects are kept raw (non-reactive) – they are mutated from RxJS
  * callbacks and timers outside Vue. Instead, a `version` counter is bumped on every
  * simulation tick, node event and store action; views read it to re-evaluate.
@@ -12,7 +15,7 @@
 
 import { computed, inject, markRaw, provide, ref, shallowRef, type InjectionKey } from 'vue';
 import { System } from '~~/src/network/system';
-import { SystemNode } from '~~/src/network/system_node';
+import { SystemNode, type ChainConflict } from '~~/src/network/system_node';
 import { edgeId, resolveBroadcastTargets } from '~/utils/graph/broadcast';
 import { createBroadcastAnimations, type BroadcastAnimations, type PacketKind } from './useBroadcastAnimations';
 
@@ -23,7 +26,13 @@ export interface NodeView {
   isMining: boolean;
   miningDelay: number;
   connectedIds: string[];
+  /** Number of blocks in the node's chain */
+  chainLength: number;
+  /** Connected peers with a diverging chain the node has not decided on yet */
+  openConflicts: number;
 }
+
+export type { ChainConflict };
 
 export interface NetworkEdge {
   id: string;
@@ -116,8 +125,31 @@ export function createNetworkStore(options: NetworkStoreOptions = {}) {
       isMining: node.isMining,
       miningDelay: node.miningDelay,
       connectedIds: node.connectedNodes.map(item => item.node.id),
+      chainLength: node.blockchain.getBlockchainLength(),
+      openConflicts: node.getChainConflicts().filter(conflict => !conflict.retained).length,
     };
   }
+
+  /**
+   * Connected peers whose chain diverges from the node's chain
+   * @param id - Node id
+   */
+  function getChainConflicts(id: string): ChainConflict[] {
+    void version.value;
+    return getNode(id)?.getChainConflicts() ?? [];
+  }
+
+  /** Ids of edges between two nodes with diverging chains, where at least one has not decided yet */
+  const conflictEdgeIds = computed<Set<string>>(() => {
+    void version.value;
+    const result = new Set<string>();
+    nodes.value.forEach((node) => {
+      node.getChainConflicts()
+        .filter(conflict => !conflict.retained)
+        .forEach(conflict => result.add(edgeId(node.id, conflict.peerId)));
+    });
+    return result;
+  });
 
   function isConnected(a: string, b: string): boolean {
     void version.value;
@@ -253,6 +285,30 @@ export function createNetworkStore(options: NetworkStoreOptions = {}) {
     }
   }
 
+  /**
+   * Resolve a chain conflict by switching the node to the peer's chain
+   * @param id - Node that adopts the chain
+   * @param peerId - Connected peer with the conflicting chain
+   * @returns true if the peer's chain was valid and adopted
+   */
+  function adoptChain(id: string, peerId: string): boolean {
+    const adopted = !!getNode(id)?.adoptChain(peerId);
+    touch();
+    return adopted;
+  }
+
+  /**
+   * Resolve a chain conflict by keeping the node's own chain
+   * @param id - Node that keeps its chain
+   * @param peerId - Connected peer with the conflicting chain
+   * @returns true if there was a conflict to resolve
+   */
+  function retainChain(id: string, peerId: string): boolean {
+    const retained = !!getNode(id)?.retainChain(peerId);
+    touch();
+    return retained;
+  }
+
   function validateChain(id: string): boolean {
     return !!getNode(id)?.blockchain.isChainValid();
   }
@@ -289,6 +345,8 @@ export function createNetworkStore(options: NetworkStoreOptions = {}) {
     running,
     getNode,
     getNodeView,
+    getChainConflicts,
+    conflictEdgeIds,
     isConnected,
     addNode,
     nextNodeName,
@@ -299,6 +357,8 @@ export function createNetworkStore(options: NetworkStoreOptions = {}) {
     orderTransaction,
     sendTransaction,
     startMining,
+    adoptChain,
+    retainChain,
     validateChain,
     start,
     stop,

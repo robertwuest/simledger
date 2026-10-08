@@ -3,6 +3,8 @@
 
   Inspects the blockchain of the selected node:
   - Summary: wallet address, balance, chain height and pending transactions
+  - Chain conflicts: connected peers with a diverging chain, resolved by retaining the
+    own chain or adopting the peer's chain
   - Blocks: the chain (newest first), expandable to block details and transactions
   - Pending: transactions waiting to be mined
   - Ledger: all confirmed transactions
@@ -68,6 +70,50 @@
             <dd class="font-semibold tabular-nums text-highlighted" :data-testid="`explorer-stat-${stat.key}`">{{ stat.value }}</dd>
           </div>
         </dl>
+        <div v-if="conflicts.length" class="space-y-2" data-testid="explorer-conflicts">
+          <UAlert
+            v-for="conflict in conflicts"
+            :key="conflict.peerId"
+            :color="conflict.retained ? 'neutral' : 'warning'"
+            variant="subtle"
+            :icon="conflict.retained ? 'i-lucide-shield-check' : 'i-lucide-git-fork'"
+            :title="conflict.retained ? `Keeping own chain over ${conflict.peerId}'s` : `Chain conflict with ${conflict.peerId}`"
+            :ui="{ root: 'p-2.5', title: 'text-sm', description: 'text-xs', actions: 'mt-2' }"
+            :data-peer-id="conflict.peerId"
+            data-testid="explorer-conflict"
+          >
+            <template #description>
+              <p>
+                Chains fork at block #{{ conflict.forkIndex }}:
+                {{ view.id }} has {{ conflict.ownLength }}, {{ conflict.peerId }} has {{ conflict.peerLength }} blocks.
+              </p>
+              <p class="mt-0.5 text-muted" data-testid="explorer-conflict-hint">{{ conflictHint(conflict) }}</p>
+            </template>
+            <template #actions>
+              <UButton
+                v-if="!conflict.retained"
+                size="xs"
+                color="neutral"
+                variant="outline"
+                icon="i-lucide-shield"
+                data-testid="explorer-conflict-retain"
+                @click="retainChain(conflict.peerId)"
+              >
+                Retain own chain
+              </UButton>
+              <UButton
+                size="xs"
+                :color="conflict.retained ? 'neutral' : 'warning'"
+                :variant="conflict.retained ? 'outline' : 'solid'"
+                icon="i-lucide-git-merge"
+                data-testid="explorer-conflict-adopt"
+                @click="adoptChain(conflict.peerId)"
+              >
+                Adopt {{ conflict.peerId }}'s chain
+              </UButton>
+            </template>
+          </UAlert>
+        </div>
       </section>
 
       <UAccordion
@@ -98,6 +144,16 @@
               >
                 <span class="font-mono font-semibold">#{{ block.index }}</span>
                 <UBadge v-if="block.index === 0" color="secondary" variant="subtle" size="sm">Genesis</UBadge>
+                <UBadge
+                  v-else-if="forkIndex !== null && block.index >= forkIndex"
+                  color="warning"
+                  variant="subtle"
+                  size="sm"
+                  title="Not part of a connected peer's chain"
+                  data-testid="explorer-block-forked"
+                >
+                  Fork
+                </UBadge>
                 <span class="whitespace-nowrap text-xs text-muted">{{ block.transactions.length }} tx</span>
                 <code class="ms-auto truncate font-mono text-xs text-dimmed">{{ block.hash.slice(0, 10) }}</code>
                 <UIcon name="i-lucide-chevron-right" class="size-4 shrink-0 text-dimmed transition-transform" :class="{ 'rotate-90': expandedBlock === block.index }" />
@@ -153,7 +209,7 @@ import PaneHeader from './PaneHeader.vue';
 import NodeDot from './ledger/NodeDot.vue';
 import AddressLabel from './ledger/AddressLabel.vue';
 import TransactionItem from './ledger/TransactionItem.vue';
-import { useNetwork } from '~/composables/useNetwork';
+import { useNetwork, type ChainConflict } from '~/composables/useNetwork';
 
 const network = useNetwork();
 const toast = useToast();
@@ -182,6 +238,17 @@ const pending = computed(() => {
 const blocksNewestFirst = computed(() => chain.value
   .map((block, index) => ({ ...block, index, transactions: block.transactions }))
   .reverse());
+
+/** Peers with a diverging chain, undecided conflicts first */
+const conflicts = computed<ChainConflict[]>(() => (node.value
+  ? [...network.getChainConflicts(node.value.id)].sort((a, b) => Number(a.retained) - Number(b.retained))
+  : []));
+
+/** First own block that is not shared with a peer in an undecided conflict */
+const forkIndex = computed(() => {
+  const open = conflicts.value.filter(conflict => !conflict.retained);
+  return open.length ? Math.min(...open.map(conflict => conflict.forkIndex)) : null;
+});
 
 const ledgerCount = computed(() => chain.value.reduce((sum, block) => sum + block.transactions.length, 0));
 
@@ -223,6 +290,41 @@ function formatTimestamp(timestamp: string) {
   return ms > 0 ? new Date(ms).toLocaleTimeString([], { hour12: false }) : '—';
 }
 
+/**
+ * What the longest-chain rule says about a conflict
+ * @param conflict - Conflict with a connected peer
+ */
+function conflictHint(conflict: ChainConflict) {
+  if (conflict.retained) {
+    return 'Decided until one of the chains changes. A longer chain is still adopted automatically.';
+  }
+  if (conflict.ownLength === conflict.peerLength) {
+    return 'Both chains have the same length, the longest-chain rule cannot decide.';
+  }
+  if (conflict.peerLength > conflict.ownLength) {
+    return `${conflict.peerId}'s chain is longer, the longest-chain rule would adopt it.`;
+  }
+  return 'The own chain is longer, the longest-chain rule keeps it.';
+}
+
+function retainChain(peerId: string) {
+  if (!view.value) return;
+  const nodeId = view.value.id;
+  if (network.retainChain(nodeId, peerId)) {
+    toast.add({ title: 'Chain retained', description: `${nodeId} keeps its chain and ignores ${peerId}'s conflicting chain.`, icon: 'i-lucide-shield-check', color: 'neutral' });
+  }
+}
+
+function adoptChain(peerId: string) {
+  if (!view.value) return;
+  const nodeId = view.value.id;
+  if (network.adoptChain(nodeId, peerId)) {
+    toast.add({ title: 'Chain adopted', description: `${nodeId} switched to ${peerId}'s chain.`, icon: 'i-lucide-git-merge', color: 'success' });
+  } else {
+    toast.add({ title: 'Chain not adopted', description: `${peerId}'s chain failed validation. See the console for details.`, icon: 'i-lucide-ban', color: 'error' });
+  }
+}
+
 async function copyAddress() {
   if (!view.value) return;
   try {
@@ -233,5 +335,5 @@ async function copyAddress() {
   }
 }
 
-defineExpose({ expandedBlock, toggleBlock, formatTimestamp });
+defineExpose({ expandedBlock, toggleBlock, formatTimestamp, conflictHint, retainChain, adoptChain });
 </script>
