@@ -3,9 +3,9 @@
         <UButton variant="ghost" size="sm" icon="i-lucide-info" class="-mr-1" />
         <template #content>
             <div class="sml-info-popup">
-              <UButton variant="ghost" size="sm" icon="i-lucide-x" class="-mr-1 absolute top-2 right-2" @click="open = false" />
+              <UButton variant="ghost" size="sm" icon="i-lucide-x" class="-mr-1 absolute top-2 right-2" @click="() => { open = false }" />
             <div class="sml-info-popup__header p-4">
-                <img src="/img/logo.png" alt="SimLedger Logo"/>
+                <img :src="asset('img/logo.png')" alt="SimLedger Logo">
             </div>
             <p class="sml-info-popup__version">
                 <strong>Version:</strong> {{ appVersion }}
@@ -49,6 +49,9 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useAppVersion } from '~~/app/plugins/version';
+import { useAssetUrl } from '~/composables/useAssetUrl';
+
+const asset = useAssetUrl();
 
 const open = ref(false)
 const appVersion = useAppVersion();

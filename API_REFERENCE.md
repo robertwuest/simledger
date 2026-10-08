@@ -930,143 +930,59 @@ const r2 = SmlCommon.RandomSeed(1, 100, 12345);  // Same as r1
 
 ## Graph/Visualization Module
 
-### Dracula Class
+The graph is rendered with Vue Flow. The frontend state lives in composables under `app/composables/`.
 
-Main graph data structure.
-
-```typescript
-export default class Dracula {
-  nodes: { [key: string]: DraculaNode };
-  edges: DraculaEdge[];
-  layoutMinX: number;
-  layoutMinY: number;
-  layoutMaxX: number;
-  layoutMaxY: number;
-}
-```
-
-#### Methods
-
-##### addNode()
+### Network Store (`app/composables/useNetwork.ts`)
 
 ```typescript
-addNode(id: string | number | object, nodeData?: object): DraculaNode
+const network = createNetworkStore(options?: {
+  system?: System;
+  animations?: BroadcastAnimations;
+  flashDuration?: number; // default 2000 ms
+});
+provideNetwork(network); // in a parent component
+const network = useNetwork(); // in descendants
 ```
 
-Adds a node to the graph (or gets existing node).
+**State**
+- `nodes: ShallowRef<SystemNode[]>`, `nodeIds: ComputedRef<string[]>`
+- `edges: ComputedRef<{ id, source, target }[]>` – derived from the peer connections
+- `selectedNodeId: Ref<string | null>`, `flashing: Ref<string[]>`, `running: Ref<boolean>`
+- `version: Ref<number>` – bumped whenever domain state may have changed
 
-**Parameters:**
-- `id` - Node identifier
-- `nodeData` - Optional node data/properties
+**Actions**
+- `addNode(id)` / `nextNodeName()`
+- `connect(a, b)`, `disconnect(a, b)`, `toggleConnection(a, b)`, `isConnected(a, b)`
+- `select(id | null)`
+- `orderTransaction(issuerId, fromAddress, toAddress, amount, signingKey): boolean`
+- `sendTransaction(issuerId, fromId, toId, amount): boolean`
+- `startMining(id)`, `validateChain(id): boolean`
+- `start()`, `stop()`, `dispose()`
+- `getNode(id)`, `getNodeView(id): { id, address, balance, isMining, miningDelay, connectedIds }`
 
-**Returns:**
-- `DraculaNode` - The added or existing node
-
-##### addEdge()
+### Broadcast Animations (`app/composables/useBroadcastAnimations.ts`)
 
 ```typescript
-addEdge(
-  sourceNode: string | number | object,
-  targetNode: string | number | object,
-  opts?: object
-): DraculaEdge
+const animations = createBroadcastAnimations({ duration?, now?, reducedMotion? });
+animations.launch('tx' | 'block', fromId, toId);
+animations.packetsFor(edgeId);
+animations.purgeEdge(edgeId);
+animations.clear();
 ```
 
-Adds a directed edge between two nodes.
-
-**Parameters:**
-- `sourceNode` - Source node or ID
-- `targetNode` - Target node or ID
-- `opts` - Optional edge properties (style, etc.)
-
-**Returns:**
-- `DraculaEdge` - The created edge
-
----
-
-### Layout Classes
-
-#### Spring Layout
-
-Force-directed layout algorithm.
+### Graph Helpers (`app/utils/graph/`)
 
 ```typescript
-export default class Spring extends Layout
+edgeId(a, b): string // 'A--B', order independent
+resolveBroadcastTargets(senderId, referrerId, neighborIds): string[]
+computeSpringLayout(ids, edges, { iterations?, scale?, padding?, rng? }): Record<string, { x, y }>
+easeInOutQuad(t), packetOpacity(t), progressAt(now, { startedAt, duration }), pointOnPath(path, t, reverse?)
+getFloatingEdgeParams(sourceRect, targetRect): { sx, sy, tx, ty, sourceSide, targetSide }
 ```
-
-Nodes repel each other while edges attract, settling into a natural equilibrium.
-
-#### OrderedTree Layout
-
-Binary tree layout algorithm.
-
-```typescript
-export default class OrderedTree extends Layout
-```
-
-Positions nodes at fixed Y coordinates based on tree depth.
-
-#### TournamentTree Layout
-
-Tournament bracket layout.
-
-```typescript
-export default class TournamentTree extends Layout
-```
-
----
-
-### Renderer Classes
-
-#### Raphael Renderer
-
-SVG rendering using Raphael library.
-
-```typescript
-export default class Raphael extends Renderer
-```
-
-Features:
-- Draggable nodes
-- Bezier curve edges
-- Arrow heads for directed edges
-- Node styling
-
-#### SnapSVG Renderer
-
-SVG rendering using SnapSVG library.
-
-```typescript
-export default class SnapSVG extends Renderer
-```
-
-Alternative renderer with similar capabilities.
 
 ---
 
 ## Type Definitions
-
-### DraculaNode
-
-```typescript
-interface DraculaNode {
-  id: string;
-  data?: any;
-  edges: DraculaEdge[];
-  layoutPosX?: number;
-  layoutPosY?: number;
-}
-```
-
-### DraculaEdge
-
-```typescript
-interface DraculaEdge {
-  source: DraculaNode;
-  target: DraculaNode;
-  style?: any;
-}
-```
 
 ### BlockBroadcast
 
@@ -1148,25 +1064,18 @@ alice.orderTransaction(
 setTimeout(() => system.stop(), 10000);
 ```
 
-### Visualizing a Graph
+### Driving the Network Store
 
 ```typescript
-import { Graph, Layout, Renderer } from '~/src/dracula';
+import { createNetworkStore } from '~/composables/useNetwork';
 
-// Create graph
-const graph = Graph.create();
-
-// Add nodes and edges
-const node1 = graph.addNode('node1', { label: 'Alice' });
-const node2 = graph.addNode('node2', { label: 'Bob' });
-graph.addEdge(node1, node2, { directed: true });
-
-// Layout
-const layout = new Layout.Spring(graph);
-
-// Render
-const renderer = new Renderer.Raphael('canvas-id', graph);
-renderer.draw();
+const network = createNetworkStore();
+network.start();
+network.addNode('Alice');
+network.addNode('Bob');
+network.connect('Alice', 'Bob');
+network.select('Alice');
+network.startMining('Alice');
 ```
 
 ---

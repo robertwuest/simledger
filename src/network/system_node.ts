@@ -104,8 +104,9 @@ export class SystemNode {
    * @param toAddress
    * @param amount
    * @param signingKey
+   * @returns true if the transaction was accepted into the pending pool
    */
-  orderTransaction(fromAddress: string, toAddress: string, amount: number, signingKey: any) {
+  orderTransaction(fromAddress: string, toAddress: string, amount: number, signingKey: any): boolean {
     const tx = new Transaction(fromAddress, toAddress, amount);
     tx.signTransaction(signingKey);
     if (this.blockchain.addTransaction(tx)) {
@@ -113,7 +114,9 @@ export class SystemNode {
         this.broadcastTransaction.next({ tx, sender: this, referrer: this });
         this.eventEmitter.next({ msg: SystemNode.events.BROADCAST_TX, referrer: this });
       });
+      return true;
     }
+    return false;
   }
 
   /**
@@ -135,9 +138,9 @@ export class SystemNode {
           // Add the newly mined block to the chain
           if (this.blockchain.addBlock(newBlock)) {
             this.blockchain.pendingTransactions = [
-              rewardTx,
+              rewardTx!,
             ];
-            this.broadcastBlock.next({ block: newBlock, sender: this, rewardTx, referrer: this });
+            this.broadcastBlock.next({ block: newBlock, sender: this, rewardTx: rewardTx!, referrer: this });
             this.eventEmitter.next({ msg: SystemNode.events.BROADCAST_BLOCK, referrer: this });
             this.isMining = false;
             if (callback) {
@@ -190,7 +193,7 @@ export class SystemNode {
               }
               continue;
             }
-            if (divertingChain || this.getBlock(i).hash !== sender.getBlock(i).hash) {
+            if (divertingChain || this.getBlock(i)!.hash !== sender.getBlock(i)!.hash) {
               divertingChain = true;
               this.blockchain.truncateChain(i);
               if (!this.blockchain.addBlock(sender.getBlock(i))) {

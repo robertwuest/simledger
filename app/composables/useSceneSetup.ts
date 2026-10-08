@@ -1,68 +1,58 @@
 /**
  * Scene Setup Composable
- * Handles declarative scene initialization within Vue components
+ * Handles declarative scene initialization on top of the network store
  */
 
-import type { SceneConfig } from '~/config/scenes';
+import type { GenesisConfig, SceneConfig } from '~/config/scenes';
+import type { NetworkStore } from './useNetwork';
 import SmlCommon from '~~/src/common';
+
+export const GENESIS_DELAY = 1000;
 
 export const useSceneSetup = () => {
   /**
    * Initialize a complete scene from configuration
+   * @param config - Scene description (nodes, connections, genesis transaction)
+   * @param network - Network store to populate
+   * @returns Function cancelling the pending genesis transaction
    */
-  const initializeScene = async (config: SceneConfig, dashboard: any) => {
-    if (!dashboard) {
-      console.error('Dashboard instance is required');
-      return;
-    }
+  const initializeScene = (config: SceneConfig, network: NetworkStore) => {
+    config.nodes.forEach(node => network.addNode(node.id));
 
-    // Create all nodes
-    const nodeMap = new Map<string, any>();
-    for (const nodeConfig of config.nodes) {
-      const node = dashboard.addNode(nodeConfig.id);
-      nodeMap.set(nodeConfig.id, node);
-    }
-
-    // Connect nodes
-    for (const conn of config.connections) {
-      const nodeA = nodeMap.get(conn.from);
-      const nodeB = nodeMap.get(conn.to);
-      if (nodeA && nodeB) {
-        dashboard.connectNodes(nodeA, nodeB);
-      } else {
+    config.connections.forEach((conn) => {
+      if (!network.getNode(conn.from) || !network.getNode(conn.to)) {
         console.warn(`Connection failed: ${conn.from} -> ${conn.to}`);
+        return;
       }
-    }
+      network.connect(conn.from, conn.to);
+    });
 
-    // Setup genesis transaction
     if (config.genesis) {
-      setupGenesis(config.genesis, nodeMap, dashboard);
+      return setupGenesis(config.genesis, network);
     }
-
-    return nodeMap;
+    return () => {};
   };
 
   /**
-   * Setup genesis transaction
+   * Issue the genesis transaction to the configured recipient
    */
-  const setupGenesis = (genesisConfig: any, nodeMap: Map<string, any>, dashboard: any) => {
-    const genesisAcc = SmlCommon.generateKeyPair(genesisConfig.privateKey);
-    const recipientNode = nodeMap.get(genesisConfig.recipient);
-
-    if (!recipientNode) {
+  const setupGenesis = (genesisConfig: GenesisConfig, network: NetworkStore) => {
+    const recipient = network.getNode(genesisConfig.recipient);
+    if (!recipient) {
       console.warn(`Genesis recipient not found: ${genesisConfig.recipient}`);
-      return;
+      return () => {};
     }
-
-    setTimeout(() => {
-      dashboard.orderTransaction(
+    const genesisAcc = SmlCommon.generateKeyPair(genesisConfig.privateKey);
+    const timer = setTimeout(() => {
+      network.orderTransaction(
+        recipient.id,
         SmlCommon.HexToBase58(genesisAcc.getPublic(true, 'hex')),
-        recipientNode.systemNode.address,
+        recipient.address,
         genesisConfig.amount,
         genesisAcc,
-        recipientNode
       );
-    }, 1000);
+    }, GENESIS_DELAY);
+    return () => clearTimeout(timer);
   };
 
   return {

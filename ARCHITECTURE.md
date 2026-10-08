@@ -145,52 +145,44 @@ Peer validates and adds block to chain
 
 ## Visualization Layer
 
-Interactive graph visualization of the network topology.
+Interactive graph visualization of the network topology, built on
+[Vue Flow](https://vueflow.dev) – the Vue implementation of the React Flow (xyflow) model.
 
-### Graph Library: Dracula
+### State
 
-Dracula provides graph data structure and rendering:
+**Network store** (`app/composables/useNetwork.ts`)
+- `createNetworkStore()` creates the store, `provideNetwork()` provides it from `app.vue`, `useNetwork()` injects it
+- Owns the `System`, the `SystemNode` instances, `selectedNodeId`, error flashes and the animation store
+- `edges` are derived from the domain (`SystemNode.connectedNodes`) with a canonical id `A--B`, so the
+  graph can never drift from the simulated network
+- Domain objects stay raw (non-reactive); a `version` counter is bumped on every tick, node event and
+  store action so views re-evaluate
+- Routes node events: `BROADCAST_TX` / `BROADCAST_BLOCK` → packets, `MESSAGE` warnings → node error flash
 
-- **Graph** - Container for nodes and edges
-- **Layout Algorithms** - Spring, OrderedTree, TournamentTree
-- **Renderers** - Raphael, SnapSVG (SVG-based rendering)
+**Broadcast animations** (`app/composables/useBroadcastAnimations.ts`)
+- Packets `{ kind, fromId, toId, edgeId, startedAt, duration }` keyed by edge
+- The store owns the lifecycle: packets expire after 2 s and are purged when an edge is removed
 
-### Graph Components
+### Graph Components (`app/components/graph/`)
 
-#### Layout Algorithms
+- **GraphViewer** – hosts `<VueFlow>` with background, controls, minimap and the toolbar panel.
+  Vue Flow owns node positions; node ids and edges come from the store. Handles node click (select),
+  `connect` (drag between handles) and edge removal (Backspace / Delete).
+- **NetworkNode** – custom node: name, balance, mining state (gears, lottery die, progress bar),
+  error flash, connection menu.
+- **NetworkEdge** – floating bezier edge attaching to the node borders facing each other; renders the
+  packets of its connection through `EdgeLabelRenderer`.
+- **BroadcastPacket** – requestAnimationFrame loop sampling the live SVG path
+  (`getPointAtLength`) with quad in-out easing and a fade-out over the last 40 %. Because the path
+  is read every frame, packets follow edges while nodes are dragged or the view is zoomed.
 
-**Spring Layout** (`src/dracula/layout/spring.ts`)
-- Force-directed graph layout
-- Nodes repel each other, edges attract
-- Iteratively settles into equilibrium
+### Helpers (`app/utils/graph/`)
 
-**OrderedTree Layout** (`src/dracula/layout/ordered_tree.ts`)
-- Assumes perfect binary tree structure
-- Positions nodes at fixed Y coordinates based on tree depth
-
-**TournamentTree Layout** (`src/dracula/layout/tournament_tree.ts`)
-- Alternative tree layout
-- Used for tournament-style hierarchies
-
-#### Renderers
-
-**Raphael Renderer** (`src/dracula/renderer/raphael.ts`)
-- Uses Raphael library for SVG rendering
-- Creates draggable nodes
-- Animates edges with bezier curves
-- Supports directed graphs with arrows
-
-**SnapSVG Renderer** (`src/dracula/renderer/snap.ts`)
-- Alternative renderer using SnapSVG
-- Similar functionality to Raphael
-
-### Network Visualization Features
-
-- **Node Representation** - Shows network participants
-- **Edge Representation** - Shows connections between nodes
-- **Interactive Dragging** - Move nodes around
-- **Transaction Animation** - GSAP-animated objects flowing along edges
-- **Real-time Updates** - New nodes and edges render immediately
+- `spring-layout.ts` – force-directed layout (ported from the former Dracula spring layout) with an
+  injectable random source for deterministic results
+- `broadcast.ts` – `edgeId()` and `resolveBroadcastTargets()` (relays skip the edge back to the referrer)
+- `motion.ts` – easing, opacity curve, progress and path sampling
+- `floating-edge.ts` – edge end points on the node rectangles
 
 ## Application Layer
 
@@ -212,64 +204,49 @@ The application uses a declarative approach for scene setup:
 - Easily extensible: add custom scenes by creating new `SceneConfig` objects
 
 #### Scene Setup Composable (`app/composables/useSceneSetup.ts`)
-- Vue composable following Nuxt auto-import conventions
-- `initializeScene(config, dashboard)` - Main initialization function
-  - Creates all nodes from configuration
+- `initializeScene(config, network)` - Main initialization function
+  - Creates all nodes from configuration in the network store
   - Establishes peer connections bidirectionally
   - Sets up genesis transaction with 1-second delay
-  - Returns node map for programmatic access
-- `setupGenesis()` - Private helper that handles initial coin distribution
+  - Returns a function cancelling the pending genesis transaction
 - Error handling for missing nodes or invalid connections
 
 ### Main Components
 
 #### App (`app/app.vue`)
-- Root component
-- Uses `useSceneSetup` composable for declarative scene initialization
-- Loads `defaultScene` from `app/config/scenes.ts`
-- Clean separation: configuration in config/, logic in composables/, UI in components/
+- Root component, provides the network store
+- Starts the simulation and loads `defaultScene` through `useSceneSetup`
+- Header with color mode toggle and info popup
 
-#### Dashboard (`app/components/dashboard.vue`)
-- Main layout with split panes
-- Manages node collection
-- Coordinates between components
-- Handles transaction ordering
+#### Dashboard (`app/components/Dashboard.vue`)
+- Layout with split panes: graph, explorer, console and editor
 
-#### GraphViewer (`app/components/graphviewer.vue`)
-- Renders network graph
-- Manages graph layout and renderer
-- Handles node/edge visualization
-- Animates transactions with GSAP
-- Supports context menus
+#### GraphViewer (`app/components/graph/GraphViewer.vue`)
+- See [Visualization Layer](#visualization-layer)
 
-#### NodeExplorer (`app/components/nodeexplorer.vue`)
-- Displays selected node information
-- Shows node's blockchain
-- Lists pending transactions
+#### NodeExplorer (`app/components/NodeExplorer.vue`)
+- Node picker synchronised with the graph selection
+- Shows the node's ledger, pending transactions and chain
 
-#### NodeEditor (`app/components/nodeeditor.vue`)
-- Allows creating new nodes
-- Manages node connections
-- Initiates transactions
+#### NodeEditor (`app/components/NodeEditor.vue`)
+- Creates transactions between wallets, issued by the selected node
+- Starts mining and validates the chain (result shown as toast)
+
+#### LogConsole (`app/components/LogConsole.vue`)
+- Live log messages of all nodes (max. 400 entries)
 
 ### Data Flow
 
 ```
-User Action (create node, send transaction)
+User action (graph, editor, toolbar)
     ↓
-Vue Component emits event
+Network store action (connect, sendTransaction, startMining, ...)
     ↓
-Dashboard processes event
+SystemNode / Blockchain state changes, events on node.eventEmitter
     ↓
-SystemNode instance created/updated
+Store bumps `version`, launches broadcast packets, flashes warnings
     ↓
-Node's blockchain or network state changes
-    ↓
-GraphViewer observes changes
-    ↓
-Graph re-renders
-    ↓
-Vue updates UI
+Vue re-renders nodes, edges, explorer and packets
 ```
 
 ## Utilities

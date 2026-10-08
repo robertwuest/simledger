@@ -11,12 +11,16 @@
   - Clear button to reset logs
   - Maximum 400 entries with FIFO eviction
   - Automatic cleanup of subscriptions on unmount
-  
-  @prop nodes - Array of network nodes with SystemNode instances to monitor
+
+  Nodes are taken from the network store.
 -->
 <template>
   <div class="sml-console">
-    <button type="button" class="sml-console__action" @click="clearLogs">Clear</button>
+    <PaneHeader title="Console">
+      <template #actions>
+        <UButton size="xs" variant="ghost" color="neutral" icon="i-lucide-eraser" data-testid="console-clear" @click="clearLogs">Clear</UButton>
+      </template>
+    </PaneHeader>
     <div ref="scrollArea" class="sml-console__body">
       <div v-if="entries.length === 0" class="sml-console__empty">No log entries yet.</div>
       <div v-else class="sml-console__list">
@@ -25,6 +29,7 @@
           :key="entry.id"
           class="sml-console__row"
           :data-type="entry.type"
+          data-testid="console-entry"
         >
           <span class="sml-console__time">{{ formatTime(entry.timestamp) }}</span>
           <span class="sml-console__node">{{ entry.nodeId }}</span>
@@ -47,6 +52,8 @@
  */
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { SystemNode } from '~~/src/network/system_node';
+import PaneHeader from './PaneHeader.vue';
+import { useNetwork } from '~/composables/useNetwork';
 
 /**
  * Log entry type definition
@@ -64,11 +71,9 @@ type LogEntry = {
   timestamp: number;
 };
 
-const props = defineProps<{
-  nodes: {
-    systemNode: SystemNode,
-  }[],
-}>();
+const MAX_ENTRIES = 400;
+
+const network = useNetwork();
 
 const entries = ref<LogEntry[]>([]);
 const scrollArea = ref<HTMLDivElement>();
@@ -77,14 +82,14 @@ let counter = 0;
 
 /**
  * Subscribe to a node's event emitter and add its messages to the log
- * @param node - Node object containing a SystemNode instance
+ * @param node - SystemNode instance
  */
-function bindNode(node: { systemNode: SystemNode }) {
-  const nodeId = node.systemNode.id;
+function bindNode(node: SystemNode) {
+  const nodeId = node.id;
   if (subscriptions.has(nodeId)) {
     return;
   }
-  const sub = node.systemNode.eventEmitter.subscribe((event: any) => {
+  const sub = node.eventEmitter.subscribe((event: any) => {
     if (event?.msg === SystemNode.events.MESSAGE) {
       pushEntry({
         nodeId,
@@ -97,7 +102,7 @@ function bindNode(node: { systemNode: SystemNode }) {
 }
 
 /**
- * Remove subscriptions for nodes that are no longer in the props
+ * Remove subscriptions for nodes that are no longer in the network
  * @param currentIds - Set of currently active node IDs
  */
 function unbindMissing(currentIds: Set<string>) {
@@ -116,7 +121,7 @@ function unbindMissing(currentIds: Set<string>) {
  */
 function pushEntry(entry: Omit<LogEntry, 'id' | 'timestamp'>) {
   entries.value.push({ ...entry, id: ++counter, timestamp: Date.now() });
-  if (entries.value.length > 400) {
+  if (entries.value.length > MAX_ENTRIES) {
     entries.value.shift();
   }
   nextTick(() => {
@@ -141,12 +146,12 @@ function sanitize(message: string) {
  * Binds new nodes and unbinds removed nodes
  */
 function syncSubscriptions() {
-  props.nodes.forEach(bindNode);
-  const ids = new Set(props.nodes.map(n => n.systemNode.id));
+  network.nodes.value.forEach(bindNode);
+  const ids = new Set(network.nodeIds.value);
   unbindMissing(ids);
 }
 
-watch(() => props.nodes.map(n => n.systemNode.id).join(','), () => {
+watch(() => network.nodeIds.value.join(','), () => {
   syncSubscriptions();
 }, { immediate: true });
 
@@ -188,28 +193,8 @@ onBeforeUnmount(() => {
 .sml-console {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    height: calc(100% - 28px);
     position: absolute;
-    width: 100%;
-    top: 28px;
-}
-
-/* Clear button in toolbar */
-.sml-console__action {
-  border: 1px solid var(--ui-bg-muted);
-  background: var(--ui-bg-accented);
-  color: var(--ui-text-primary);
-  padding: 0px 8px;
-  cursor: pointer;
-  transition: background 0.15s ease;
-  position: absolute;
-  right: 2px;
-  top: -27px;
-}
-
-.sml-console__action:hover {
-  background: var(--ui-bg-elevated);
+    inset: 0;
 }
 
 /* Scrollable log container */
