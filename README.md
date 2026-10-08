@@ -10,6 +10,8 @@ An educational blockchain simulator built with Vue 3, Nuxt 4 and TypeScript. Bui
 of nodes in an interactive graph, send signed transactions, mine blocks with proof of work and watch
 transactions, blocks and forks spread through the network.
 
+![SimLedger dashboard with the graph viewer, explorer, console and editor](./docs/screenshot.png)
+
 ## Overview
 
 With **SimLedger** you can:
