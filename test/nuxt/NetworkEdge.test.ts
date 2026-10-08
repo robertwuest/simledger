@@ -70,4 +70,14 @@ describe('NetworkEdge', () => {
     expect(wrapper.findAllComponents(BroadcastPacket)).toHaveLength(0);
     vi.useRealTimers();
   });
+  it('is dashed while both nodes have diverging chains', async () => {
+    const wrapper = await mountEdge();
+    expect(wrapper.find('.base-edge').classes()).not.toContain('sml-edge--conflict');
+    const getChainConflicts = vi.spyOn(network.getNode('Bob')!, 'getChainConflicts')
+      .mockReturnValue([{ peerId: 'Alice', forkIndex: 1, ownLength: 2, peerLength: 2, retained: false }]);
+    network.touch();
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('.base-edge').classes()).toContain('sml-edge--conflict');
+    getChainConflicts.mockRestore();
+  });
 });

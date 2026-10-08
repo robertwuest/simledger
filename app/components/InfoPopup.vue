@@ -29,6 +29,7 @@
                     <li><strong>Proof-of-Work:</strong> Consensus mechanism with SHA256-based block hashing</li>
                     <li><strong>Transaction Validation:</strong> Elliptic curve signatures and mining rewards</li>
                     <li><strong>Network Simulation:</strong> Multi-node topology with real-time broadcasting</li>
+                    <li><strong>Forks &amp; Consensus:</strong> Longest-chain rule with console feedback; retain or adopt a peer's chain in a conflict</li>
                     <li><strong>Interactive Visualization:</strong> Animated transaction flow and node inspection</li>
                 </ul>
             </section>

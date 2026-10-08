@@ -5,6 +5,7 @@
   - Name and live wallet balance
   - Mining state (spinning gears, PoW lottery die, progress bar)
   - Error flash when the node logs a warning
+  - Fork icon while the node's chain conflicts with a connected peer
   - Connection menu to connect / disconnect peers
 
   The SystemNode itself is looked up in the network store by the node id.
@@ -15,6 +16,7 @@
     class="sml-node"
     :class="{
       'sml-node--mining': view.isMining,
+      'sml-node--conflict': view.openConflicts > 0,
       'sml-node--selected': selected,
       'sml-node--error': flashing,
     }"
@@ -26,6 +28,13 @@
     <Handle type="target" :position="Position.Top" class="sml-node__handle" />
     <div class="sml-node__header">
       <h3 class="sml-node__title">{{ id }}</h3>
+      <UIcon
+        v-if="view.openConflicts"
+        name="i-lucide-git-fork"
+        class="sml-node__conflict"
+        :title="conflictTitle"
+        data-testid="node-conflict"
+      />
       <UIcon v-if="view.isMining" name="i-lucide-cog" class="sml-node__process" data-testid="node-mining-icon" />
       <ConnectionMenu v-else :node-id="id" :disabled="view.isMining" />
     </div>
@@ -64,9 +73,13 @@ const view = computed(() => network.getNodeView(props.id));
 const selected = computed(() => network.selectedNodeId.value === props.id);
 const color = computed(() => nodeColor(network.nodeIds.value.indexOf(props.id)));
 const flashing = computed(() => network.flashing.value.includes(props.id));
+const conflictTitle = computed(() => {
+  const count = view.value?.openConflicts ?? 0;
+  return `Chain conflict with ${count === 1 ? 'a peer' : `${count} peers`}, resolve it in the explorer`;
+});
 const ariaLabel = computed(() => {
   if (!view.value) return props.id;
-  return `${props.id}, balance ${view.value.balance}${view.value.isMining ? ', mining' : ''}`;
+  return `${props.id}, balance ${view.value.balance}${view.value.isMining ? ', mining' : ''}${view.value.openConflicts ? ', chain conflict' : ''}`;
 });
 </script>
 
@@ -101,6 +114,16 @@ const ariaLabel = computed(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.sml-node__conflict {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin-right: auto;
+  color: var(--ui-warning);
+}
+.sml-node--conflict {
+  border-style: dashed;
 }
 .sml-node__balance {
   font-size: 0.875rem;

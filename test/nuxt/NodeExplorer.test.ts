@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises } from '@vue/test-utils';
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import NodeExplorer from '~/components/NodeExplorer.vue';
-import type { NetworkStore } from '~/composables/useNetwork';
+import type { ChainConflict, NetworkStore } from '~/composables/useNetwork';
 import { genesisKeyPair } from '../support/fixtures';
 import { createTestNetwork, mountWithNetwork } from '../support/network';
 
@@ -152,5 +152,97 @@ describe('NodeExplorer', () => {
     expect(network.selectedNodeId.value).toBe('Bob');
     wrapper.findComponent({ name: 'USelect' }).vm.$emit('update:modelValue', undefined);
     expect(network.selectedNodeId.value).toBeNull();
+  });
+  describe('chain conflicts', () => {
+    const conflict = (overrides: Partial<ChainConflict> = {}): ChainConflict => ({ peerId: 'Bob', forkIndex: 1, ownLength: 2, peerLength: 2, retained: false, ...overrides });
+
+    /** Pretend Alice's chain diverges from Bob's; the domain behaviour is covered by the unit tests */
+    function stubConflicts(...conflicts: ChainConflict[]) {
+      const alice = network.getNode('Alice')!;
+      const genesis = alice.blockchain.chain[0]!;
+      alice.blockchain.chain.push({ ...genesis, hash: 'f0rk', previousHash: genesis.hash, timestamp: '1', transactions: [] } as any);
+      return {
+        get: vi.spyOn(alice, 'getChainConflicts').mockReturnValue(conflicts),
+        retain: vi.spyOn(alice, 'retainChain').mockReturnValue(true),
+        adopt: vi.spyOn(alice, 'adoptChain').mockReturnValue(true),
+      };
+    }
+
+    const alerts = (wrapper: Wrapper) => wrapper.findAll('[data-testid="explorer-conflict"]');
+
+    it('shows no conflicts while all chains agree', async () => {
+      network.select('Alice');
+      const wrapper = await mountExplorer();
+      expect(wrapper.find('[data-testid="explorer-conflicts"]').exists()).toBe(false);
+      expect(wrapper.find('[data-testid="explorer-block-forked"]').exists()).toBe(false);
+    });
+
+    it('explains an open conflict and marks the forked blocks', async () => {
+      stubConflicts(conflict());
+      network.select('Alice');
+      const wrapper = await mountExplorer();
+      const [alert] = alerts(wrapper);
+      expect(alert!.attributes('data-peer-id')).toBe('Bob');
+      expect(alert!.text()).toContain('Chain conflict with Bob');
+      expect(alert!.text()).toContain('Chains fork at block #1: Alice has 2, Bob has 2 blocks.');
+      expect(alert!.find('[data-testid="explorer-conflict-hint"]').text()).toBe('Both chains have the same length, the longest-chain rule cannot decide.');
+      expect(alert!.find('[data-testid="explorer-conflict-retain"]').text()).toBe('Retain own chain');
+      expect(alert!.find('[data-testid="explorer-conflict-adopt"]').text()).toBe("Adopt Bob's chain");
+      // Newest first: the forked block #1 is marked, the genesis block is shared
+      expect(wrapper.findAll('[data-testid="explorer-block"]').map(block => block.find('[data-testid="explorer-block-forked"]').exists())).toEqual([true, false]);
+    });
+
+    it('describes what the longest-chain rule would do', async () => {
+      const wrapper = await mountExplorer();
+      const vm = wrapper.vm as unknown as { conflictHint(c: ChainConflict): string };
+      expect(vm.conflictHint(conflict({ peerLength: 3 }))).toBe("Bob's chain is longer, the longest-chain rule would adopt it.");
+      expect(vm.conflictHint(conflict({ ownLength: 3 }))).toBe('The own chain is longer, the longest-chain rule keeps it.');
+      expect(vm.conflictHint(conflict({ retained: true }))).toContain('Decided until one of the chains changes');
+    });
+
+    it('retains the own chain', async () => {
+      const { retain } = stubConflicts(conflict());
+      network.select('Alice');
+      const wrapper = await mountExplorer();
+      await wrapper.find('[data-testid="explorer-conflict-retain"]').trigger('click');
+      expect(retain).toHaveBeenCalledWith('Bob');
+      expect(toastAdd).toHaveBeenCalledWith(expect.objectContaining({ title: 'Chain retained' }));
+    });
+
+    it("adopts the peer's chain", async () => {
+      const { adopt } = stubConflicts(conflict());
+      network.select('Alice');
+      const wrapper = await mountExplorer();
+      await wrapper.find('[data-testid="explorer-conflict-adopt"]').trigger('click');
+      expect(adopt).toHaveBeenCalledWith('Bob');
+      expect(toastAdd).toHaveBeenCalledWith(expect.objectContaining({ title: 'Chain adopted', color: 'success' }));
+    });
+
+    it('reports a chain that failed validation', async () => {
+      const { adopt } = stubConflicts(conflict());
+      adopt.mockReturnValue(false);
+      network.select('Alice');
+      const wrapper = await mountExplorer();
+      await wrapper.find('[data-testid="explorer-conflict-adopt"]').trigger('click');
+      expect(toastAdd).toHaveBeenCalledWith(expect.objectContaining({ title: 'Chain not adopted', color: 'error' }));
+    });
+
+    it('lists retained conflicts after open ones, still offering to adopt', async () => {
+      stubConflicts(conflict({ peerId: 'Carol', retained: true }), conflict({ peerId: 'Dave' }));
+      network.select('Alice');
+      const wrapper = await mountExplorer();
+      expect(alerts(wrapper).map(alert => alert.attributes('data-peer-id'))).toEqual(['Dave', 'Carol']);
+      const retained = alerts(wrapper)[1]!;
+      expect(retained.text()).toContain("Keeping own chain over Carol's");
+      expect(retained.find('[data-testid="explorer-conflict-retain"]').exists()).toBe(false);
+      expect(retained.find('[data-testid="explorer-conflict-adopt"]').exists()).toBe(true);
+    });
+
+    it('does not mark blocks for retained conflicts', async () => {
+      stubConflicts(conflict({ retained: true }));
+      network.select('Alice');
+      const wrapper = await mountExplorer();
+      expect(wrapper.find('[data-testid="explorer-block-forked"]').exists()).toBe(false);
+    });
   });
 });

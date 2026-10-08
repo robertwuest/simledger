@@ -4,8 +4,8 @@ const port = Number(process.env.PORT || 4173);
 const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE;
 
 /**
- * End-to-end tests against the statically generated site, served under the same
- * base path as the GitHub Pages deployment.
+ * End-to-end tests against the statically generated site, served under a sub path
+ * so asset URLs are checked against the configured base URL.
  */
 export default defineConfig({
   testDir: 'test/e2e',
