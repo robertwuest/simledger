@@ -127,7 +127,7 @@ export class Blockchain {
    */
   getBalanceOfAddress(address: string, blockIndex?: number): number {
     if (blockIndex !== undefined && blockIndex < this.chain.length) {
-      const block = this.chain[blockIndex];
+      const block = this.chain[blockIndex]!;
       return this.stateManager.getBalanceAtBlock(address, block.hash);
     }
     return this.stateManager.getBalance(address);
@@ -168,7 +168,7 @@ export class Blockchain {
    * @returns {Block} The last block in the chain
    */
   getLatestBlock() {
-    return this.chain[this.chain.length - 1];
+    return this.chain[this.chain.length - 1]!;
   }
 
   /**
@@ -258,8 +258,8 @@ export class Blockchain {
    */
   isChainValid() {
     for (let i = 1; i < this.chain.length; i++) {
-      const currentBlock = this.chain[i];
-      const previousBlock = this.chain[i - 1];
+      const currentBlock = this.chain[i]!;
+      const previousBlock = this.chain[i - 1]!;
       // Recalculate the hash of the block and see if it matches up.
       // This allows us to detect changes to a single block
       if (currentBlock.hash !== currentBlock.generateHash()) {
@@ -279,7 +279,7 @@ export class Blockchain {
       }
     }
     // Check the genesis block
-    if (this.chain[0].hash !== this.createGenesisBlock().hash) {
+    if (this.chain[0]!.hash !== this.createGenesisBlock().hash) {
       this.log('warn', '%c✗ Chain invalid: Genesis block invalid', 'background: #44FF44; color: #000');
       return false;
     }

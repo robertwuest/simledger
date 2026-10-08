@@ -122,16 +122,16 @@ export class AccountStateManager {
       for (let i = 0; i < level.length; i += 2) {
         if (i + 1 < level.length) {
           // Hash pairs together
-          nextLevel.push(SHA256(level[i] + level[i + 1]).toString());
+          nextLevel.push(SHA256(level[i]! + level[i + 1]!).toString());
         } else {
           // Odd node gets promoted to next level
-          nextLevel.push(level[i]);
+          nextLevel.push(level[i]!);
         }
       }
       level = nextLevel;
     }
 
-    return level[0];
+    return level[0]!;
   }
 
   /**

@@ -2,14 +2,26 @@
 @import "@nuxt/ui";
 
 body {
-	 margin: 0;
+  margin: 0;
 }
 
- :root {
+/*
+ * Dark theme: lighter than the Nuxt UI defaults, with distinct surface layers
+ * (canvas < pane < elevated), visible borders and WCAG AA text contrast.
+ * Built from the configured neutral palette so it follows `appConfig.ui.colors.neutral`.
+ */
+.dark {
+  --ui-bg: color-mix(in oklch, var(--ui-color-neutral-800) 80%, var(--ui-color-neutral-700));
+  --ui-bg-muted: color-mix(in oklch, var(--ui-color-neutral-800) 50%, var(--ui-color-neutral-900));
+  --ui-bg-elevated: color-mix(in oklch, var(--ui-color-neutral-800) 45%, var(--ui-color-neutral-700));
+  --ui-bg-accented: color-mix(in oklch, var(--ui-color-neutral-700) 70%, var(--ui-color-neutral-600));
 
+  --ui-border: color-mix(in oklch, var(--ui-color-neutral-700) 70%, var(--ui-color-neutral-600));
+  --ui-border-muted: var(--ui-color-neutral-700);
+  --ui-border-accented: var(--ui-color-neutral-600);
+
+  --ui-text-dimmed: var(--ui-color-neutral-400);
+  --ui-text-muted: var(--ui-color-neutral-300);
+  --ui-text-toned: var(--ui-color-neutral-200);
+  --ui-text: var(--ui-color-neutral-100);
 }
- @media (prefers-color-scheme: dark) {
-	 :root {
-	}
-}
- 

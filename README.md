@@ -24,12 +24,23 @@ simledger/
 ├── app/                          # Vue 3 frontend application
 │   ├── app.vue                   # Root component
 │   ├── components/               # Vue components
-│   │   ├── dashboard.vue         # Main dashboard layout
-│   │   ├── graphviewer.vue       # Network graph visualization
-│   │   ├── nodeexplorer.vue      # Node information panel
-│   │   └── nodeeditor.vue        # Node editing interface
-│   ├── composables/              # Vue composables (auto-imported)
+│   │   ├── Dashboard.vue         # Main dashboard layout (split panes)
+│   │   ├── NodeExplorer.vue      # Blockchain explorer of the selected node
+│   │   ├── NodeEditor.vue        # Transaction and mining controls
+│   │   ├── LogConsole.vue        # Node log viewer
+│   │   └── graph/                # Vue Flow network graph
+│   │       ├── GraphViewer.vue   # Vue Flow canvas, toolbar, controls, minimap
+│   │       ├── NetworkNode.vue   # Custom node (balance, mining state, menu)
+│   │       ├── NetworkEdge.vue   # Floating edge rendering broadcast packets
+│   │       ├── BroadcastPacket.vue # Packet animated along an edge
+│   │       ├── ConnectionMenu.vue  # Connect / disconnect peers
+│   │       └── GraphToolbar.vue  # Add node, layout, fit view, pause
+│   ├── composables/              # Vue composables
+│   │   ├── useNetwork.ts         # Network store (nodes, edges, selection, actions)
+│   │   ├── useBroadcastAnimations.ts # Packets travelling along edges
 │   │   └── useSceneSetup.ts      # Scene initialization logic
+│   ├── utils/                    # Framework-free helpers
+│   │   └── graph/                # Layout, broadcast routing, motion, edge geometry
 │   └── config/                   # Scene configurations
 │       └── scenes.ts             # Scene presets and definitions
 ├── src/
@@ -41,17 +52,6 @@ simledger/
 │   │   ├── system.ts             # Main simulation loop
 │   │   ├── system_node.ts        # Individual node representation
 │   │   └── tick.ts               # Tick/cycle event structure
-│   ├── dracula/                  # Graph visualization library
-│   │   ├── dracula.ts            # Core graph data structure
-│   │   ├── layout/               # Layout algorithms
-│   │   │   ├── layout.ts         # Base layout class
-│   │   │   ├── spring.ts         # Spring layout algorithm
-│   │   │   ├── ordered_tree.ts   # Tree layout algorithm
-│   │   │   └── tournament_tree.ts# Tournament tree layout
-│   │   └── renderer/             # SVG rendering engines
-│   │       ├── renderer.ts       # Base renderer class
-│   │       ├── raphael.ts        # Raphael renderer
-│   │       └── snap.ts           # Snap SVG renderer
 │   └── common.ts                 # Shared utilities & crypto helpers
 ├── assets/                       # Static assets
 ├── public/                       # Public files
@@ -62,7 +62,7 @@ simledger/
 
 - **Frontend**: Vue 3, Nuxt 4, TypeScript
 - **Blockchain**: SHA256 hashing, secp256k1 elliptic curve cryptography
-- **Visualization**: Raphael/SnapSVG for graph rendering, GSAP for animations
+- **Visualization**: [Vue Flow](https://vueflow.dev) (Vue port of the React Flow / xyflow model) for the network graph, requestAnimationFrame-driven packet animations
 - **State Management**: RxJS for reactive system events
 - **UI Components**: Nuxt UI, SplitPanes for responsive layouts
 
@@ -81,8 +81,10 @@ simledger/
 - Configurable simulation cycle time (default: 2000ms)
 
 ### Visualization
-- Interactive graph-based network view
-- Animated transaction flow between nodes
+- Interactive graph-based network view with zoom, pan, minimap and fit view
+- Drag between node handles to connect peers, select an edge and press Backspace to disconnect
+- Animated transaction / block flow along the edges, following nodes while they are dragged
+- Light / dark mode toggle
 - Node property inspector
 - Real-time state updates
 
@@ -192,6 +194,48 @@ The application is automatically deployed to GitHub Pages when changes are pushe
 
 To trigger a manual deployment, go to the Actions tab in GitHub and run the "Deploy to GitHub Pages" workflow.
 
+## Testing
+
+| Command | What it runs |
+| --- | --- |
+| `npm test` | All Vitest projects (unit + component) |
+| `npm run test:unit` | Framework-free tests in Node: graph helpers, stores, blockchain / network domain |
+| `npm run test:nuxt` | Component and composable tests in the Nuxt runtime (happy-dom, `@nuxt/test-utils`) |
+| `npm run test:coverage` | All Vitest projects with V8 coverage and thresholds |
+| `npm run test:e2e` | Playwright end-to-end tests against the generated site served under `/simledger/` |
+| `npm run typecheck` | `vue-tsc` over the app and the tests |
+
+Tests live in `test/`:
+
+- `test/unit/` – spring layout, broadcast routing, motion / easing, floating edges, network and animation stores,
+  scene setup, transactions, blockchain mining (the real `public/js/mining.js` runs in a fake Worker) and `SystemNode` broadcasting
+- `test/nuxt/` – components mounted with `mountSuspended`: node card, connection menu, edge and packet animation
+  (mocked `requestAnimationFrame` and path sampling), graph viewer, toolbar, explorer, editor, console, dashboard
+- `test/e2e/` – the running app: default scene, selection sync, connecting / disconnecting (menu, handle drag, Backspace),
+  dragging, toolbar, color mode, packets travelling and being relayed, packets following a dragged node, mining,
+  rejected transactions and reduced motion
+
+The E2E suite builds the site itself (`npm run e2e:build`) unless a server is already running on port 4173.
+Install the browser once with `npx playwright install chromium`, or point `PLAYWRIGHT_CHROMIUM_EXECUTABLE` at an existing Chromium.
+
+## Dependency Audit
+
+Dependencies are kept current with `npm audit fix`. The remaining `npm audit` findings have no patched
+release within the version ranges their parents allow. All of them except `elliptic` are build or
+development tooling that never ships with the statically generated site:
+
+| Package | Severity | Pulled in by | Status |
+| --- | --- | --- | --- |
+| `simple-git`, `@simple-git/argv-parser` | critical | `@nuxt/devtools` (dev only) | Fixed only in simple-git 4 / argv-parser 2; devtools 3.x requires simple-git ^3 |
+| `node-forge` | high | `@nuxt/cli` → `listhen` (dev server HTTPS) | No patched release |
+| `braces` (→ `micromatch`, `fast-glob`, `globby`) | high | `nitropack` (build) | No patched release |
+| `esbuild` 0.27 | low | `@nuxt/fonts` → `fontless` (dev server) | Fixed in 0.28, outside the parent's range |
+| `elliptic` | low | wallet keys and signatures (`src/common.ts`) | No patched release; accepted for this educational simulator, which handles no real funds |
+
+The intermediate packages `npm audit` lists (`nuxt`, `@nuxt/cli`, `@nuxt/devtools`, `@nuxt/nitro-server`,
+`@nuxt/vite-builder`, `@nuxt/test-utils`, `nitropack`, `listhen`) are only flagged because they depend on
+the packages above. Re-check with `npm audit` when Nuxt publishes updates.
+
 ## Core Concepts
 
 ### Blockchain Architecture
@@ -207,10 +251,11 @@ The simulation operates on a tick-based system:
 - Each node maintains its own blockchain state
 
 ### Graph Visualization
-Uses the Dracula graph library with:
-- Multiple layout algorithms (Spring, OrderedTree, TournamentTree)
-- Raphael/SnapSVG rendering engines
-- Interactive node dragging and connection management
+Built on Vue Flow (`@vue-flow/core`):
+- The network store (`useNetwork`) is the single source of truth; Vue Flow nodes and edges are derived from it
+- Custom `network` node and floating `network` edge types
+- Spring (force-directed) auto layout (`app/utils/graph/spring-layout.ts`)
+- Broadcast packets are sampled from the live edge path every animation frame and honor `prefers-reduced-motion`
 
 ### Scene Configuration
 Declarative scene setup using Vue composables:
