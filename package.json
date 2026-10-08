@@ -8,7 +8,15 @@
     "dev": "nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
+    "postinstall": "nuxt prepare",
+    "typecheck": "nuxi typecheck",
+    "test": "vitest run",
+    "test:unit": "vitest run --project unit",
+    "test:nuxt": "vitest run --project nuxt",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "e2e:build": "nuxi generate",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@nuxt/ui": "^3.3.2",

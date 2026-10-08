@@ -3,6 +3,7 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
 const packageJson = JSON.parse(readFileSync(resolve('./package.json'), 'utf-8'));
+const baseURL = (process.env.NUXT_APP_BASE_URL || '/').replace(/\/+$/, '') + '/';
 
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
@@ -30,7 +31,17 @@ export default defineNuxtConfig({
       }
     }
   },
+  $test: {
+    // Tests never load web fonts; skip the remote font provider lookups
+    fonts: {
+      providers: { google: false, googleicons: false, bunny: false, fontshare: false, fontsource: false, adobe: false },
+    },
+  },
   app: {
-    baseURL: (process.env.NUXT_APP_BASE_URL || '/').replace(/\/+$/, '') + '/',
+    baseURL,
+    head: {
+      title: 'SimLedger',
+      link: [{ rel: 'icon', type: 'image/x-icon', href: `${baseURL}favicon.ico` }],
+    },
   }
 })

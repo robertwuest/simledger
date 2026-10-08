@@ -1,0 +1,10 @@
+{
+  // Type-check the tests (and test configs) with the same settings as the app
+  "extends": "../.nuxt/tsconfig.app.json",
+  "include": [
+    "../.nuxt/nuxt.d.ts",
+    "./**/*",
+    "../vitest.config.ts",
+    "../playwright.config.ts"
+  ]
+}

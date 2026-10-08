@@ -194,6 +194,30 @@ The application is automatically deployed to GitHub Pages when changes are pushe
 
 To trigger a manual deployment, go to the Actions tab in GitHub and run the "Deploy to GitHub Pages" workflow.
 
+## Testing
+
+| Command | What it runs |
+| --- | --- |
+| `npm test` | All Vitest projects (unit + component) |
+| `npm run test:unit` | Framework-free tests in Node: graph helpers, stores, blockchain / network domain |
+| `npm run test:nuxt` | Component and composable tests in the Nuxt runtime (happy-dom, `@nuxt/test-utils`) |
+| `npm run test:coverage` | All Vitest projects with V8 coverage and thresholds |
+| `npm run test:e2e` | Playwright end-to-end tests against the generated site served under `/simledger/` |
+| `npm run typecheck` | `vue-tsc` over the app and the tests |
+
+Tests live in `test/`:
+
+- `test/unit/` – spring layout, broadcast routing, motion / easing, floating edges, network and animation stores,
+  scene setup, transactions, blockchain mining (the real `public/js/mining.js` runs in a fake Worker) and `SystemNode` broadcasting
+- `test/nuxt/` – components mounted with `mountSuspended`: node card, connection menu, edge and packet animation
+  (mocked `requestAnimationFrame` and path sampling), graph viewer, toolbar, explorer, editor, console, dashboard
+- `test/e2e/` – the running app: default scene, selection sync, connecting / disconnecting (menu, handle drag, Backspace),
+  dragging, toolbar, color mode, packets travelling and being relayed, packets following a dragged node, mining,
+  rejected transactions and reduced motion
+
+The E2E suite builds the site itself (`npm run e2e:build`) unless a server is already running on port 4173.
+Install the browser once with `npx playwright install chromium`, or point `PLAYWRIGHT_CHROMIUM_EXECUTABLE` at an existing Chromium.
+
 ## Core Concepts
 
 ### Blockchain Architecture

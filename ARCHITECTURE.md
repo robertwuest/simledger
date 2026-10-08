@@ -328,9 +328,20 @@ All network communication uses RxJS BehaviorSubjects for thread-safe event emiss
 
 ## Testing Strategy
 
-1. **Unit Tests** - Blockchain, Block, Transaction classes
-2. **Integration Tests** - Multi-node network behavior
-3. **Simulation Tests** - Long-running network scenarios
+The test pyramid follows the Nuxt / Vue tooling:
+
+1. **Unit tests** (`test/unit`, Vitest, Node) – pure graph helpers, the network and animation stores,
+   scene setup and the blockchain / network domain. Mining runs the real `public/js/mining.js` inside a
+   fake Worker; the simulation clock is driven with fake timers.
+2. **Component tests** (`test/nuxt`, Vitest + `@nuxt/test-utils` + Vue Test Utils, happy-dom) – every
+   component mounted in the Nuxt runtime against a provided network store. The packet animation is
+   tested frame by frame with a mocked `requestAnimationFrame` and a stub SVG path.
+3. **End-to-end tests** (`test/e2e`, Playwright, Chromium) – the statically generated site served under
+   the GitHub Pages base path, covering interactions that need real layout: dragging, handle connections,
+   edge selection and packets travelling along rendered edges.
+
+Coverage thresholds are enforced per area in `vitest.config.ts`; CI (`.github/workflows/test.yml`) runs
+type checking, unit and component tests with coverage, and the E2E suite.
 
 ## Deployment
 
