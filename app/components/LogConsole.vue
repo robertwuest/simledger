@@ -200,15 +200,14 @@ onBeforeUnmount(() => {
 /* Scrollable log container */
 .sml-console__body {
   flex: 1;
-  border: 1px solid var(--ui-bg-muted);
-  background: var(--ui-bg-default);
+  background: var(--ui-bg);
   overflow-y: auto;
   padding: 6px 4px;
 }
 
 /* Empty state message */
 .sml-console__empty {
-  color: var(--ui-text-secondary);
+  color: var(--ui-text-muted);
   font-size: 0.9rem;
   padding: 4px 6px;
 }
@@ -228,33 +227,33 @@ onBeforeUnmount(() => {
   align-items: baseline;
   padding: 4px 6px;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--ui-bg-elevated);
   font-family: var(--ui-font-mono, "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace);
   font-size: 0.85rem;
-  color: var(--ui-text-primary);
+  color: var(--ui-text);
 }
 
 /* Warning severity styling (yellow) */
 .sml-console__row[data-type="warn"] {
-  border-left: 4px solid #e0a800;
-  background: rgba(224, 168, 0, 0.08);
+  border-left: 4px solid var(--ui-warning);
+  background: color-mix(in oklch, var(--ui-warning) 12%, var(--ui-bg));
 }
 
 /* Error severity styling (red) */
 .sml-console__row[data-type="error"] {
-  border-left: 4px solid #c53030;
-  background: rgba(197, 48, 48, 0.1);
+  border-left: 4px solid var(--ui-error);
+  background: color-mix(in oklch, var(--ui-error) 12%, var(--ui-bg));
 }
 
 /* Info/log severity styling (blue) */
 .sml-console__row[data-type="log"] {
-  border-left: 4px solid #4aa3ff;
-  background: rgba(74, 163, 255, 0.06);
+  border-left: 4px solid var(--ui-info);
+  background: color-mix(in oklch, var(--ui-info) 8%, var(--ui-bg));
 }
 
 /* Timestamp column */
 .sml-console__time {
-  color: var(--ui-text-secondary);
+  color: var(--ui-text-muted);
 }
 
 /* Node ID column */

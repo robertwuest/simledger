@@ -55,7 +55,7 @@ onBeforeUnmount(() => {
   gap: 10px;
   padding: 10px 15px;
   background-color: var(--ui-bg-elevated);
-  border-bottom: 1px solid var(--ui-bg-accented);
+  border-bottom: 1px solid var(--ui-border);
 }
 
 .sml-app-header__actions {

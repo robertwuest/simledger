@@ -78,7 +78,7 @@ const ariaLabel = computed(() => {
   padding: 8px 10px;
   border-radius: 12px;
   border: 3px solid var(--sml-node-color, var(--ui-primary));
-  background: var(--ui-bg);
+  background: var(--ui-bg-elevated);
   color: var(--ui-text);
   text-align: left;
   transition: box-shadow 0.2s ease;

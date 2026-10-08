@@ -56,6 +56,7 @@ import PaneHeader from './PaneHeader.vue';
     display: flex;
     flex-direction: column;
     position: relative;
+    background-color: var(--ui-bg);
   }
   .default-theme.splitpanes .splitpanes__pane {
     background-color: transparent;

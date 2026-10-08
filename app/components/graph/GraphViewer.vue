@@ -249,7 +249,7 @@ defineExpose({ flowNodes, flowEdges, autoLayout, fit, onConnect, onEdgesChange, 
   border-radius: 12px;
 }
 .sml-graph-viewer .vue-flow__edge-path {
-  stroke: var(--ui-text-muted);
+  stroke: var(--ui-text-dimmed);
   stroke-width: 2;
 }
 .sml-graph-viewer .vue-flow__connection-path {
