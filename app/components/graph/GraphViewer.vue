@@ -12,7 +12,7 @@
   node positions.
 -->
 <template>
-  <div class="sml-graph-viewer" data-testid="graph-viewer">
+  <div ref="root" class="sml-graph-viewer" data-testid="graph-viewer">
     <ClientOnly>
       <VueFlow
         :id="FLOW_ID"
@@ -28,6 +28,7 @@
         @connect="onConnect"
         @edges-change="onEdgesChange"
         @nodes-initialized="onNodesInitialized"
+        @move-start="onMoveStart"
       >
         <template #node-network="{ id }">
           <NetworkNode :id="id" />
@@ -53,7 +54,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import {
   ConnectionMode,
   Panel,
@@ -85,8 +86,14 @@ const NODE_WIDTH = 150;
 const network = useNetwork();
 const { fitView } = useVueFlow(FLOW_ID);
 
-const flowNodes = ref<Node[]>([]);
-let initialFitDone = false;
+// Shallow: Vue Flow replaces the array on every change (v-model), positions need no deep tracking
+const flowNodes = shallowRef<Node[]>([]);
+const root = ref<HTMLElement>();
+let nodesReady = false;
+/** Set once the user pans or zooms; until then the graph is re-fitted when its pane resizes */
+let viewAdjusted = false;
+let resizeObserver: ResizeObserver | undefined;
+let fitFrame: number | null = null;
 
 const flowEdges = computed<Edge[]>(() => network.edges.value.map(edge => ({
   id: edge.id,
@@ -146,11 +153,47 @@ function onEdgesChange(changes: EdgeChange[]) {
 }
 
 function onNodesInitialized() {
-  if (!initialFitDone) {
-    initialFitDone = true;
-    fit();
+  if (!nodesReady) {
+    nodesReady = true;
+    scheduleFit();
   }
 }
+
+/**
+ * Fit on the next frame: Vue Flow updates its viewport size from its own ResizeObserver,
+ * fitting synchronously would use the previous pane size.
+ */
+function scheduleFit() {
+  if (fitFrame === null) {
+    fitFrame = requestAnimationFrame(() => {
+      fitFrame = null;
+      fit();
+    });
+  }
+}
+
+function onMoveStart() {
+  viewAdjusted = true;
+}
+
+onMounted(() => {
+  if (typeof ResizeObserver === 'undefined' || !root.value) {
+    return;
+  }
+  resizeObserver = new ResizeObserver(() => {
+    if (nodesReady && !viewAdjusted) {
+      scheduleFit();
+    }
+  });
+  resizeObserver.observe(root.value);
+});
+
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect();
+  if (fitFrame !== null) {
+    cancelAnimationFrame(fitFrame);
+  }
+});
 
 function fit() {
   fitView({ padding: 0.2, duration: 300 });

@@ -218,6 +218,24 @@ Tests live in `test/`:
 The E2E suite builds the site itself (`npm run e2e:build`) unless a server is already running on port 4173.
 Install the browser once with `npx playwright install chromium`, or point `PLAYWRIGHT_CHROMIUM_EXECUTABLE` at an existing Chromium.
 
+## Dependency Audit
+
+Dependencies are kept current with `npm audit fix`. The remaining `npm audit` findings have no patched
+release within the version ranges their parents allow. All of them except `elliptic` are build or
+development tooling that never ships with the statically generated site:
+
+| Package | Severity | Pulled in by | Status |
+| --- | --- | --- | --- |
+| `simple-git`, `@simple-git/argv-parser` | critical | `@nuxt/devtools` (dev only) | Fixed only in simple-git 4 / argv-parser 2; devtools 3.x requires simple-git ^3 |
+| `node-forge` | high | `@nuxt/cli` → `listhen` (dev server HTTPS) | No patched release |
+| `braces` (→ `micromatch`, `fast-glob`, `globby`) | high | `nitropack` (build) | No patched release |
+| `esbuild` 0.27 | low | `@nuxt/fonts` → `fontless` (dev server) | Fixed in 0.28, outside the parent's range |
+| `elliptic` | low | wallet keys and signatures (`src/common.ts`) | No patched release; accepted for this educational simulator, which handles no real funds |
+
+The intermediate packages `npm audit` lists (`nuxt`, `@nuxt/cli`, `@nuxt/devtools`, `@nuxt/nitro-server`,
+`@nuxt/vite-builder`, `@nuxt/test-utils`, `nitropack`, `listhen`) are only flagged because they depend on
+the packages above. Re-check with `npm audit` when Nuxt publishes updates.
+
 ## Core Concepts
 
 ### Blockchain Architecture

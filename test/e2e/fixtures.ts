@@ -16,6 +16,15 @@ export const test = base.extend<{ app: Page }>({
     });
     await page.goto('./');
     await expect(page.getByTestId('network-node')).toHaveCount(5);
+    // Let the initial fit-view animation settle so measured positions stay valid
+    const transform = () => page.locator('.vue-flow__transformationpane').getAttribute('style');
+    let previous = await transform();
+    await expect.poll(async () => {
+      const current = await transform();
+      const stable = current === previous;
+      previous = current;
+      return stable;
+    }, { intervals: [150] }).toBe(true);
     await use(page);
     expect(errors, 'console errors').toEqual([]);
   },
@@ -35,11 +44,22 @@ export async function center(locator: Locator) {
 
 export const distance = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
 
-/** Screen coordinates of the midpoint along an edge path (a curve's bounding box center may miss it) */
+/**
+ * Screen coordinates of the midpoint along an edge path (a curve's bounding box center may miss it).
+ * Waits until the point is stable, so an initial fit-view animation can't move the edge under the cursor.
+ */
 export async function edgeMidpoint(page: Page, id: string) {
-  return edge(page, id).locator('path.sml-edge__track').evaluate((path: SVGPathElement) => {
+  const read = () => edge(page, id).locator('path.sml-edge__track').evaluate((path: SVGPathElement) => {
     const point = path.getPointAtLength(path.getTotalLength() / 2);
     const screen = new DOMPoint(point.x, point.y).matrixTransform(path.getScreenCTM()!);
-    return { x: screen.x, y: screen.y };
+    return { x: Math.round(screen.x), y: Math.round(screen.y) };
   });
+  let previous = await read();
+  await expect.poll(async () => {
+    const current = await read();
+    const stable = current.x === previous.x && current.y === previous.y;
+    previous = current;
+    return stable;
+  }, { intervals: [100] }).toBe(true);
+  return previous;
 }

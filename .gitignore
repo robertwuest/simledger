@@ -27,3 +27,5 @@ logs
 coverage
 playwright-report
 test-results
+*.tsbuildinfo
+.nuxtrc
