@@ -1,6 +1,6 @@
 /**
- * Static server for the generated site, mounted under the GitHub Pages base path
- * (NUXT_APP_BASE_URL). Used by Playwright's webServer.
+ * Static server for the generated site, mounted under a sub path (NUXT_APP_BASE_URL,
+ * default /simledger/) to exercise the base URL handling. Used by Playwright's webServer.
  */
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';

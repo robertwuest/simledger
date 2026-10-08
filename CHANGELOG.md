@@ -35,6 +35,10 @@ versions may change behaviour between releases.
   forever; it now stops mining and logs a warning.
 - Transactions arriving while mining were added to the block being mined, which invalidated its hash.
 
+### Removed
+- GitHub Pages deployment workflow (`.github/workflows/deploy.yml`) and `public/.nojekyll`; the site is
+  deployed through Cloudflare.
+
 ### Documentation
 - README with a user guide, a section on forks and chain conflicts, and the current project structure.
 - ARCHITECTURE with consensus rules, the fork handling flow and updated performance figures.

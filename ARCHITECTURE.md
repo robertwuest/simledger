@@ -287,7 +287,7 @@ storage, incremental chain comparison.
    mounted in the Nuxt runtime against a provided network store. The packet animation is tested frame by frame
    with a mocked `requestAnimationFrame` and a stub SVG path.
 3. **End-to-end tests** (`test/e2e`, Playwright, Chromium) – the statically generated site served under the
-   GitHub Pages base path, covering interactions that need real layout and timing: dragging, handle
+   sub path `/simledger/` (checks the base URL handling), covering interactions that need real layout and timing: dragging, handle
    connections, edge selection, packets travelling along rendered edges and a split network resolving a fork.
 
 Coverage thresholds are enforced per area in `vitest.config.ts`; CI (`.github/workflows/test.yml`) runs type
@@ -296,6 +296,6 @@ checking, unit and component tests with coverage, and the E2E suite.
 ## Deployment
 
 Built with Nuxt 4 and deployable as:
-- **Static site** – `nuxt generate` (GitHub Pages, see `.github/workflows/deploy.yml`)
+- **Static site** – `nuxt generate`, deployed through Cloudflare
 - **SSR** – `nuxt build`
 - **Development** – `nuxt dev`

@@ -171,15 +171,11 @@ pnpm, yarn and bun work as well (`pnpm dev`, `yarn dev`, `bun run dev`, ...).
 
 ## Deployment
 
-The application is deployed to GitHub Pages when changes are pushed to the `main` branch
-(`.github/workflows/deploy.yml`):
+The application is deployed through Cloudflare as a static site; the deployment is configured in Cloudflare,
+not in this repository. Build it with `npm run generate` and serve `.output/public`.
 
-1. Builds the static site with `npm run generate` and the base path `/simledger/`
-2. Uploads the generated files to GitHub Pages
-3. Serves the site at `https://<username>.github.io/simledger/`
-
-To deploy manually, run the "Deploy to GitHub Pages" workflow from the Actions tab. For another sub path set
-`NUXT_APP_BASE_URL` at build time; all assets are resolved against it.
+The site is built for the root path by default. To serve it under a sub path, set `NUXT_APP_BASE_URL`
+(e.g. `/simledger/`) at build time; all assets are resolved against it.
 
 ## Testing
 
@@ -189,7 +185,7 @@ To deploy manually, run the "Deploy to GitHub Pages" workflow from the Actions t
 | `npm run test:unit` | Framework-free tests in Node: graph helpers, stores, blockchain / network domain |
 | `npm run test:nuxt` | Component and composable tests in the Nuxt runtime (happy-dom, `@nuxt/test-utils`) |
 | `npm run test:coverage` | All Vitest projects with V8 coverage and thresholds |
-| `npm run test:e2e` | Playwright end-to-end tests against the generated site served under `/simledger/` |
+| `npm run test:e2e` | Playwright end-to-end tests against the generated site served under the sub path `/simledger/` |
 | `npm run typecheck` | `vue-tsc` over the app and the tests |
 
 Tests live in `test/`:
