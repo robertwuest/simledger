@@ -1,287 +1,186 @@
 # SimLedger API Reference
 
-Complete API documentation for SimLedger blockchain simulation library.
+API documentation for SimLedger 0.1.1-alpha.1. The domain (`src/`) is framework-free TypeScript; the
+application (`app/`) builds on Vue 3 / Nuxt 4. Imports use the Nuxt aliases `~~/` (project root) and `~/` (`app/`).
 
 ## Table of Contents
 
-1. [Blockchain Module](#blockchain-module)
-2. [Network Module](#network-module)
-3. [Utilities Module](#utilities-module)
-4. [Graph/Visualization Module](#graphvisualization-module)
+1. [Blockchain Module](#blockchain-module) – `Blockchain`, `Block`, `Transaction`, `AccountStateManager`
+2. [Network Module](#network-module) – `System`, `SystemNode`, `ChainConflict`, `Tick`
+3. [Utilities Module](#utilities-module) – `SmlCommon`
+4. [Application Module](#application-module) – network store, animations, scenes, helpers
+5. [Type Definitions](#type-definitions)
+6. [Usage Examples](#usage-examples)
+7. [Console Messages](#console-messages)
+8. [Error Handling](#error-handling)
 
 ---
 
 ## Blockchain Module
 
-Core blockchain implementation with proof-of-work consensus.
-
 ### Blockchain Class
 
-Main container for the blockchain with proof-of-work consensus mechanism.
+`src/blockchain/blockchain.ts` – one node's ledger: chain, pending pool, validation and chain replacement.
 
 ```typescript
 export class Blockchain {
   chain: Block[];
-  difficulty: number;
+  difficulty: number;                 // leading zeros required in a block hash (default 1)
   pendingTransactions: Transaction[];
-  miningReward: number;
-  genesisAddress: string;
-  logSubscribers: Function[];
+  miningReward: number;               // default 10
+  genesisAddress: string;             // wallet funded by the genesis block
+  logSubscribers: Array<(type: string, message: string) => void>;
 }
 ```
 
 #### Constructor
 
 ```typescript
-constructor()
+new Blockchain()
 ```
 
-Creates a new blockchain instance with:
-- Genesis block as the first block
-- Difficulty set to 1
-- Mining reward set to 10.0 coins
-- Initial mining reward transaction
+Creates the genesis block (100 coins to `genesisAddress`) and a pending pool containing the reward for the
+genesis block's "miner" (`genesisAddress`).
 
-#### Methods
+#### Chain Access
 
-##### createGenesisBlock()
+| Method | Returns | Description |
+| --- | --- | --- |
+| `createGenesisBlock()` | `Block` | The deterministic genesis block |
+| `getBlock(index)` | `Block \| null` | Block at an index (0 = genesis), `null` if out of range |
+| `getLatestBlock()` | `Block` | Last block of the chain |
+| `getBlockchainLength()` | `number` | Number of blocks |
+| `isGenesisBlock(block)` | `boolean` | Whether the block is the genesis block |
 
-```typescript
-createGenesisBlock(): Block
-```
-
-Creates the genesis block (first block in blockchain).
-
-**Returns:**
-- `Block` - Genesis block with predefined values
-
-##### minePendingTransactions()
+#### minePendingTransactions()
 
 ```typescript
 minePendingTransactions(
   miningRewardAddress: string,
-  callback?: (newBlock: Block, rewardTx: Transaction) => void
+  callback?: (newBlock: Block | null, rewardTx: Transaction | null) => void
 ): void
 ```
 
-Mines a new block containing all pending transactions.
+Creates a block from a copy of the pending pool and mines it in a Web Worker. The callback receives the mined
+block and a new reward transaction for `miningRewardAddress` (to be included in the next block), or `null, null`
+if the pending transactions are invalid, the worker fails or mining times out (5 minutes). The block is **not**
+added to the chain; call `addBlock()`.
 
-**Parameters:**
-- `miningRewardAddress` (string) - Address to receive mining reward
-- `callback` (Function, optional) - Called with (newBlock, rewardTx) when mining completes
-
-**Process:**
-1. Creates a new block with pending transactions
-2. Validates all transactions in the block
-3. Initiates mining in a Web Worker
-4. Invokes callback with mined block and reward transaction
-
-**Example:**
-```typescript
-blockchain.minePendingTransactions('QmDkAddress', (newBlock, rewardTx) => {
-  console.log('Block mined:', newBlock.hash);
-});
-```
-
-##### getBalanceOfAddress()
-
-```typescript
-getBalanceOfAddress(
-  address: string,
-  blockIndex?: number
-): number
-```
-
-Calculates the balance for an address by summing all transactions up to a block index.
-
-**Parameters:**
-- `address` (string) - Address to calculate balance for
-- `blockIndex` (number, optional, default: chain.length-1) - Block index to calculate up to
-
-**Returns:**
-- `number` - Balance in coins
-
-**Performance:** O(n) where n = total transactions in chain
-
-**Warning:** Performance degrades with larger blockchains. Consider optimization for production.
-
-**Example:**
-```typescript
-const balance = blockchain.getBalanceOfAddress('QmDkAddress');
-console.log('Balance:', balance); // 100.5
-```
-
-##### getBlock()
-
-```typescript
-getBlock(chainLength: number): Block | null
-```
-
-Retrieves a specific block by index.
-
-**Parameters:**
-- `chainLength` (number) - Index of block to retrieve
-
-**Returns:**
-- `Block` - The block at the index
-- `null` - If index is out of bounds
-
-##### getLatestBlock()
-
-```typescript
-getLatestBlock(): Block
-```
-
-Gets the most recently added block.
-
-**Returns:**
-- `Block` - The last block in the chain
-
-##### getBlockchainLength()
-
-```typescript
-getBlockchainLength(): number
-```
-
-Gets the total number of blocks in the chain.
-
-**Returns:**
-- `number` - Length of blockchain
-
-##### addBlock()
+#### addBlock()
 
 ```typescript
 addBlock(block: Block): boolean
 ```
 
-Adds a new block to the chain with comprehensive validation.
+Adds a block that extends the chain. Checks, in order: not already known, `length` is the next position,
+hash matches the content, `previousHash` matches the latest block, transactions are valid
+(`Block.hasValidTransactions`), proof of work. On success the block's transactions are removed from the pending
+pool and the account state is updated. Every rejection is logged as a warning.
 
-**Validation Checks:**
-1. Block is not a duplicate
-2. Block index is sequential (length = lastBlock.length + 1)
-3. Block hash is correctly computed
-4. Previous hash matches last block's hash
-5. All transactions are valid
-6. Proof-of-work difficulty is satisfied (leading zeros in hash)
-
-**Parameters:**
-- `block` (Block) - Block to add
-
-**Returns:**
-- `boolean` - True if block added successfully, false if validation failed
-
-**Side Effects:**
-- Removes processed transactions from pending queue on success
-- Logs validation errors via registered subscribers
-
-##### truncateChain()
-
-```typescript
-truncateChain(index: number): void
-```
-
-Removes all blocks from specified index onwards.
-
-**Parameters:**
-- `index` (number) - Index to truncate from
-
-**Use Cases:**
-- Handling chain forks
-- Reverting to previous state
-
-##### isChainValid()
-
-```typescript
-isChainValid(): boolean
-```
-
-Validates the integrity of the entire blockchain.
-
-**Checks:**
-1. Each block's hash is correctly computed
-2. Each block's previousHash matches preceding block
-3. All transactions in each block are valid
-4. Genesis block is unchanged
-
-**Returns:**
-- `boolean` - True if valid, false if any block fails validation
-
-**Performance:** O(n) where n = number of blocks
-
-##### addTransaction()
+#### addTransaction()
 
 ```typescript
 addTransaction(transaction: Transaction): boolean
 ```
 
-Adds a transaction to the pending transactions queue.
+Adds a transaction to the pending pool. Checks: both addresses present, not already pending, valid signature,
+sender can cover it including its pending spends. Reward transactions (`fromAddress === '_'`) must pay exactly
+`miningReward` and only one may be pending.
 
-**Validation Checks:**
-1. From and to addresses are present
-2. Transaction is not a duplicate
-3. Transaction signature is valid
-4. Sender has sufficient balance (including pending transactions)
-5. Mining reward transactions are valid
-
-**Parameters:**
-- `transaction` (Transaction) - Transaction to add
-
-**Returns:**
-- `boolean` - True if added, false if validation failed
-
-**Side Effects:**
-- Logs validation errors via registered subscribers
-
-##### registerLogSubscriber()
+#### isChainValid()
 
 ```typescript
-registerLogSubscriber(callback: Function): void
+isChainValid(): boolean
 ```
 
-Registers a callback to receive blockchain log events.
+Re-validates every block's hash, its link to the previous block and its transactions, and the genesis block.
+Logs the result. O(n × m).
 
-**Callback Signature:**
-```typescript
-(type: 'log' | 'warn' | 'error', message: string) => void
-```
-
-**Parameters:**
-- `callback` (Function) - Function to call on log events
-
-**Example:**
-```typescript
-blockchain.registerLogSubscriber((type, message) => {
-  console.log(`[${type}] ${message}`);
-});
-```
-
-##### log()
+#### getBalanceOfAddress()
 
 ```typescript
-log(type: string, message: string, params?: any): void
+getBalanceOfAddress(address: string, blockIndex?: number): number
 ```
 
-Internal method to log messages to console and subscribers.
+Confirmed balance of an address – current, or after the block at `blockIndex`. O(1).
 
-**Parameters:**
-- `type` (string) - Log type: 'log', 'warn', or 'error'
-- `message` (string) - Message to log
-- `params` (any, optional) - Parameters for console formatting
+#### getForkIndex()
+
+```typescript
+getForkIndex(blocks: Block[]): number
+```
+
+Index of the first block whose hash differs from `blocks`. If one chain is a prefix of the other, the length of
+the shorter chain is returned. Both chains share all blocks before the returned index.
+
+```typescript
+own.getForkIndex(peer.chain); // 1: both chains only share the genesis block
+```
+
+#### replaceChain()
+
+```typescript
+replaceChain(blocks: Block[]): Block[] | null
+```
+
+Replaces the chain with `blocks` (including the genesis block) if the whole chain is valid. The candidate is
+replayed block by block on a fresh `Blockchain` with logging muted, so it passes the same checks as `addBlock()`.
+On success the chain and account state are swapped and the discarded own blocks (after the fork index) are
+returned; on failure `null` is returned and nothing changes. The pending pool is not touched.
+
+#### restorePendingTransactions()
+
+```typescript
+restorePendingTransactions(candidates: Transaction[]): { accepted: Transaction[]; dropped: Transaction[] }
+```
+
+Rebuilds the pending pool after the chain changed. The pool starts with a reward for the latest block's miner
+(taken from the candidates, or created), followed by the candidates that are not yet confirmed, not duplicated
+and still valid. Rewards for other addresses are ignored, invalid candidates are returned in `dropped`.
+Validation is not logged.
+
+#### truncateChain()
+
+```typescript
+truncateChain(index: number): void
+```
+
+Removes all blocks from `index` on (the genesis block is kept) and reverts the account state.
+
+#### State Helpers
+
+| Method | Returns | Description |
+| --- | --- | --- |
+| `getAllAccounts()` | `Map<string, number>` | Current balances of all addresses |
+| `getCurrentStateRoot()` | `string \| undefined` | Merkle root of the balances after the latest block |
+| `getStateStats()` | `{ accountCount, blockStateCount, totalBalance }` | State manager statistics |
+| `pruneOldStates(keepLastN = 100)` | `void` | Drop balance snapshots of older blocks |
+
+#### Logging
+
+```typescript
+registerLogSubscriber(callback: (type: string, message: string) => void): void
+log(type: 'log' | 'warn' | 'error', message: string, params?: any): void
+```
+
+`log()` writes to the browser console and notifies all subscribers. Messages may start with `%c` (console
+styling), which the UI strips. `SystemNode` subscribes to its blockchain and re-emits the messages as `MESSAGE`
+events.
 
 ---
 
 ### Block Class
 
-Immutable record of transactions with proof-of-work mining.
+`src/blockchain/block.ts`
 
 ```typescript
 export class Block {
   previousHash: string;
-  timestamp: string;
-  length: number;
+  timestamp: string;              // ms since epoch, '0' for genesis
+  length: number;                 // 1-based position in the chain
   transactions: Transaction[];
-  previousRewardAddress: string;
-  rewardAddress: string;
+  previousRewardAddress: string;  // miner of the previous block
+  rewardAddress: string;          // miner of this block
   hash: string;
   nonce: number;
 }
@@ -290,312 +189,135 @@ export class Block {
 #### Constructor
 
 ```typescript
-constructor(
-  length: number,
-  timestamp: string,
-  transactions: Transaction[],
-  rewardAddress: string,
-  previousRewardAddress: string,
-  previousHash?: string
-)
+new Block(length, timestamp, transactions, rewardAddress, previousRewardAddress, previousHash = '')
 ```
 
-Creates a new Block instance.
+Computes the hash on creation.
 
-**Parameters:**
-- `length` (number) - Block index in the chain
-- `timestamp` (string) - Creation timestamp
-- `transactions` (Transaction[]) - Transactions to include
-- `rewardAddress` (string) - Address receiving mining reward
-- `previousRewardAddress` (string) - Address that mined previous block
-- `previousHash` (string, optional) - Hash of previous block
+#### Methods
 
-**Side Effects:**
-- Automatically computes the block's hash upon creation
-
-#### Static Methods
-
-##### generateHash()
-
-```typescript
-static generateHash(block: Block): string
-```
-
-Computes the SHA256 hash of a block.
-
-**Hash Input:**
-```
-previousHash + length + timestamp + transactions + rewardAddress + nonce
-```
-
-**Parameters:**
-- `block` (Block) - Block to hash
-
-**Returns:**
-- `string` - SHA256 hash as hex string
-
-**Note:** Hash changes if nonce changes, enabling proof-of-work mining.
-
-##### mineBlock()
-
-```typescript
-static mineBlock(
-  block: Block,
-  difficulty: number,
-  callback: (minedBlock: Block) => void
-): void
-```
-
-Mines the block by finding a valid proof-of-work nonce in a Web Worker.
-
-**Process:**
-1. Sends block data to Web Worker
-2. Worker increments nonce until hash has required leading zeros
-3. Returns mined block to callback
-
-**Parameters:**
-- `block` (Block) - Block to mine
-- `difficulty` (number) - Number of leading zeros required (e.g., 1 = "0...", 2 = "00...")
-- `callback` (Function) - Called with mined block data
-
-**Example:**
-```typescript
-Block.mineBlock(block, 1, (minedBlock) => {
-  console.log('Block mined:', minedBlock.hash);
-});
-```
-
-##### hasValidTransactions()
-
-```typescript
-static hasValidTransactions(
-  block: Block,
-  blockchain: Blockchain
-): boolean
-```
-
-Validates all transactions in a block.
-
-**Validation Checks:**
-1. Exactly one reward transaction (fromAddress = '_')
-2. Reward goes to previous miner (previousRewardAddress)
-3. Reward amount matches blockchain's miningReward
-4. All regular transactions have valid signatures
-5. No double-spending (balances tracked across block)
-6. At least one regular transaction exists
-
-**Parameters:**
-- `block` (Block) - Block to validate
-- `blockchain` (Blockchain) - Blockchain context
-
-**Returns:**
-- `boolean` - True if all transactions valid, false otherwise
+| Method | Description |
+| --- | --- |
+| `generateHash(): string` | SHA256 (hex) of `previousHash + length + timestamp + transaction hashes + rewardAddress + nonce` |
+| `mineBlock(difficulty, callback: (result: { nonce, hash } \| null) => void): void` | Proof of work in the `js/mining.js` Web Worker; `null` on error or after 5 minutes |
+| `hasValidTransactions(blockchain): boolean` | Exactly one reward transaction, paying `miningReward` to `previousRewardAddress` (not required directly after genesis); valid signatures; no sender overspends relative to the parent block; at least one regular transfer |
 
 ---
 
 ### Transaction Class
 
-Cryptographically signed value transfer.
+`src/blockchain/transaction.ts`
 
 ```typescript
 export class Transaction {
-  fromAddress: string;
+  fromAddress: string;   // Base58 public key, '_' for a mining reward
   toAddress: string;
   amount: number;
-  signature: any;
+  nonce: string;
+  timestamp: number;
+  signature: string;     // DER hex, empty for rewards
 }
 ```
 
 #### Constructor
 
 ```typescript
-constructor(
-  fromAddress: string,
-  toAddress: string,
-  amount: number,
-  nonce?: string
-)
+new Transaction(fromAddress: string, toAddress: string, amount: number, nonce?: string, timestamp?: number)
 ```
 
-Creates a new Transaction instance.
+Throws for a non-finite or negative amount. `nonce` and `timestamp` are generated when omitted (pass them for
+deterministic transactions such as the genesis transaction).
 
-**Parameters:**
-- `fromAddress` (string) - Sender's address (Base58 or '_' for mining rewards)
-- `toAddress` (string) - Recipient's address (Base58)
-- `amount` (number) - Amount to transfer
-- `nonce` (string, optional) - Transaction nonce (auto-generated if not provided)
+#### Methods
 
-**Example:**
-```typescript
-const tx = new Transaction('QmFromAddr', 'QmToAddr', 50.0);
-```
-
-#### Static Methods
-
-##### generateHash()
+| Method | Description |
+| --- | --- |
+| `generateHash(): string` | SHA256 (hex) of `fromAddress + toAddress + amount + nonce + timestamp` |
+| `signTransaction(signingKey): void` | ECDSA secp256k1 signature; throws `Cannot sign transactions for other wallets` if the key does not match `fromAddress` |
+| `isValid(blockchain): boolean` | Rewards are valid; otherwise sender ≠ recipient and the signature verifies. Balances are checked by `Blockchain` |
+| `static generateNonce(): string` | Timestamp + random, base36 |
 
 ```typescript
-static generateHash(transaction: Transaction): string
+const tx = new Transaction(fromAddress, toAddress, 25);
+tx.signTransaction(keyPair);
+blockchain.addTransaction(tx);
 ```
 
-Generates a unique hash for the transaction.
+---
 
-**Hash Input:**
-```
-SHA256(fromAddress + toAddress + amount + nonce)
-```
+### AccountStateManager Class
 
-**Result:** Base58 encoded hash
+`src/blockchain/account-state.ts` – used internally by `Blockchain`.
 
-**Parameters:**
-- `transaction` (Transaction) - Transaction to hash
-
-**Returns:**
-- `string` - Base58 encoded transaction hash
-
-##### signTransaction()
-
-```typescript
-static signTransaction(
-  transaction: Transaction,
-  signingKey: any
-): void
-```
-
-Signs the transaction with the sender's private key.
-
-**Process:**
-1. Verifies signingKey's public key matches transaction.fromAddress
-2. Computes transaction hash
-3. Signs with ECDSA secp256k1
-4. Stores signature in transaction.signature
-
-**Parameters:**
-- `transaction` (Transaction) - Transaction to sign
-- `signingKey` (any) - Private key object from elliptic library
-
-**Throws:**
-- `Error` - If signing key's public key doesn't match fromAddress
-
-**Example:**
-```typescript
-const keyPair = SmlCommon.generateKeyPair();
-Transaction.signTransaction(tx, keyPair);
-```
-
-##### isValid()
-
-```typescript
-static isValid(
-  transaction: Transaction,
-  blockchain: Blockchain
-): boolean
-```
-
-Validates the transaction.
-
-**Validation Checks:**
-1. Mining rewards (fromAddress = '_') skip signature validation
-2. Sender and recipient addresses are different
-3. Transaction has a signature
-4. Signature is mathematically valid (verified with public key)
-
-**Parameters:**
-- `transaction` (Transaction) - Transaction to validate
-- `blockchain` (Blockchain) - Blockchain context (for logging)
-
-**Returns:**
-- `boolean` - True if valid, false otherwise
-
-**Note:** Balance validation is done at blockchain level, not here.
+| Method | Description |
+| --- | --- |
+| `getBalance(address)` | Current balance, O(1) |
+| `getBalanceAtBlock(address, blockHash)` | Balance after a block, O(1) |
+| `applyTransaction(tx)` | Apply a transfer to the current balances |
+| `applyBlock(block): string` | Apply all transactions, store a snapshot and return the state root |
+| `revertToBlock(blockHash): boolean` | Restore the balances after a block |
+| `canSpend(address, amount, pendingTxs = [])` | Balance minus pending spends covers `amount` |
+| `getAllAccounts()`, `getStateRoot(blockHash)`, `pruneOldStates(keepLastN)`, `getStats()` | Inspection and memory management |
 
 ---
 
 ## Network Module
 
-Multi-node blockchain network simulation.
-
 ### System Class
 
-Main simulation engine driving all node updates via tick events.
+`src/network/system.ts` – the simulation clock.
 
 ```typescript
 export class System {
-  static CycleTime: number;
+  static CycleTime: number;      // 2000 ms
   tick: BehaviorSubject<Tick>;
   stopFlag: boolean;
+  start(): void;                 // emit a tick every CycleTime
+  stop(): void;                  // stop after the current cycle
+  run(deltaTime: number): void;  // internal cycle
 }
 ```
 
-#### Static Properties
-
-##### CycleTime
-
 ```typescript
-static CycleTime = 2000;  // milliseconds
+system.tick.subscribe(({ increment, elapsedTime }) => console.log(increment, elapsedTime));
 ```
 
-Default cycle time in milliseconds. Determines tick interval.
-
-#### Properties
-
-##### tick
+### Tick Interface
 
 ```typescript
-tick: BehaviorSubject<Tick>
+export interface Tick {
+  increment: number;    // cycle counter
+  elapsedTime: number;  // ms since start
+}
 ```
-
-Observable tick events. Subscribe to receive cycle updates.
-
-```typescript
-system.tick.subscribe((tick: Tick) => {
-  console.log(`Cycle ${tick.increment} at ${tick.elapsedTime}ms`);
-});
-```
-
-#### Methods
-
-##### start()
-
-```typescript
-start(): void
-```
-
-Starts the simulation loop, beginning tick emissions at regular intervals.
-
-##### stop()
-
-```typescript
-stop(): void
-```
-
-Stops the simulation loop, preventing further tick emissions.
-
-##### run()
-
-```typescript
-run(deltaTime: number): void
-```
-
-Internal method called recursively to drive simulation.
 
 ---
 
 ### SystemNode Class
 
-Individual blockchain participant in the network.
+`src/network/system_node.ts` – a network participant with its own blockchain and wallet.
 
 ```typescript
 export class SystemNode {
   static InactiveThreshold: number;
-  
+  static readonly events: {
+    BROADCAST_TX: string;
+    BROADCAST_BLOCK: string;
+    START_MINING: string;
+    MESSAGE: string;
+    CHAIN_CONFLICT: string;
+    CHAIN_ADOPTED: string;
+    CHAIN_RETAINED: string;
+  };
+
   id: string;
-  address: string;
+  address: string;                 // Base58 compressed public key
+  keyPair: any;                    // elliptic key pair
   blockchain: Blockchain;
-  keyPair: any;
+  connectedNodes: { node: SystemNode; inactiveCycles: number; txSub: any; bkSub: any }[];
   isMining: boolean;
-  miningDelay: number;
-  connectedNodes: Connection[];
+  miningDelay: number;             // lottery roll 0–5 (extra ticks)
+  remainingMiningDelay: number;
   broadcastBlock: BehaviorSubject<BlockBroadcast>;
   broadcastTransaction: BehaviorSubject<TransactionBroadcast>;
   eventEmitter: Subject<NodeEvent>;
@@ -605,192 +327,80 @@ export class SystemNode {
 #### Constructor
 
 ```typescript
-constructor(id: string, system: System)
+new SystemNode(id: string, system: System)
 ```
 
-Creates a new network node.
+Generates a key pair, creates a blockchain and subscribes to the system ticks.
 
-**Parameters:**
-- `id` (string) - Unique node identifier
-- `system` (System) - Reference to simulation system
+#### Events
 
-**Side Effects:**
-- Generates ECDSA secp256k1 key pair
-- Creates blockchain instance
-- Subscribes to system tick events
+Published on `eventEmitter` as `{ msg, referrer?, payload? }`:
 
-#### Properties
+| `msg` | `referrer` | `payload` | Emitted when |
+| --- | --- | --- | --- |
+| `BROADCAST_TX` | node the transaction came from | – | The node sends or relays a transaction |
+| `BROADCAST_BLOCK` | node the block came from | – | The node sends or relays a block |
+| `START_MINING` | – | – | Mining started |
+| `MESSAGE` | the node | `{ type: 'log' \| 'warn' \| 'error', message }` | A log message of the node or its blockchain |
+| `CHAIN_CONFLICT` | peer | – | A chain conflict with the peer was detected and logged |
+| `CHAIN_ADOPTED` | peer | – | The node switched to the peer's chain |
+| `CHAIN_RETAINED` | peer | – | The node retained its chain in a conflict with the peer |
 
-##### blockchain
+#### Peers
 
 ```typescript
-blockchain: Blockchain
+connectToNode(node: SystemNode): boolean   // bidirectional; false if already connected
+forgetNode(id: string): void               // unsubscribe from a peer (call on both sides)
 ```
 
-This node's own blockchain instance with independent state.
+Connecting replays the peers' latest broadcasts, so both nodes apply the longest-chain rule right away; a fork
+remaining afterwards is reported as a conflict.
 
-##### address
-
-```typescript
-address: string
-```
-
-The node's public address (Base58 encoded public key). Used as transaction sender/recipient.
-
-##### keyPair
+#### Transactions and Mining
 
 ```typescript
-keyPair: KeyPair
-```
-
-ECDSA secp256k1 key pair for signing transactions.
-
-##### broadcastBlock
-
-```typescript
-broadcastBlock: BehaviorSubject<BlockBroadcast>
-```
-
-Observable emitted when node mines a new block.
-
-**Emission Value:**
-```typescript
-{
-  block: Block;
-  sender: SystemNode;
-  rewardTx: Transaction;
-  referrer: SystemNode;
-}
-```
-
-##### broadcastTransaction
-
-```typescript
-broadcastTransaction: BehaviorSubject<TransactionBroadcast>
-```
-
-Observable emitted when node receives a new transaction.
-
-**Emission Value:**
-```typescript
-{
-  tx: Transaction;
-  sender: SystemNode;
-  referrer: SystemNode;
-}
-```
-
-##### eventEmitter
-
-```typescript
-eventEmitter: Subject<NodeEvent>
-```
-
-Emits internal node events (mining, errors, blockchain logs).
-
-#### Methods
-
-##### connectToNode()
-
-```typescript
-connectToNode(node: SystemNode): boolean
-```
-
-Connects this node to another node (peer).
-
-**Process:**
-1. Subscribes to peer's block and transaction broadcasts
-2. Reciprocal: also connects the peer to this node
-3. Tracks peer as active connection
-
-**Parameters:**
-- `node` (SystemNode) - Peer to connect to
-
-**Returns:**
-- `boolean` - True if connection created, false if already connected
-
-**Example:**
-```typescript
-node1.connectToNode(node2);  // node1 ↔ node2 connected bidirectionally
-```
-
-##### getBalance()
-
-```typescript
+orderTransaction(fromAddress: string, toAddress: string, amount: number, signingKey: any): boolean
+startMining(callback?: () => void): void
 getBalance(): number
+getBlock(index: number): Block | null
+getRemainingMiningDelayPercentage(): number
 ```
 
-Gets the node's current balance.
+- `orderTransaction` signs the transaction and adds it to the own pool; it is broadcast on the next tick. Returns
+  `false` if the node rejects it.
+- `startMining` rolls the lottery delay, mines the pending pool and, after the delay, adds the block, broadcasts
+  it and calls `callback`. If the chain changed in the meantime, the block is rejected, mining stops and a
+  warning is logged.
 
-**Returns:**
-- `number` - Balance of this node's address in coins
-
-##### getBlock()
+#### Chain Conflicts
 
 ```typescript
-getBlock(chainLength: number): Block | null
+getChainConflicts(): ChainConflict[]
+retainChain(peerId: string): boolean
+adoptChain(peerId: string): boolean
 ```
 
-Gets a block from this node's blockchain.
+- `getChainConflicts` lists connected peers whose chain diverges from the own chain (a fork). Peers that are only
+  ahead or behind are not listed.
+- `retainChain` keeps the own chain. The decision is bound to the latest blocks of both chains and ends when
+  either changes. Logs and emits `CHAIN_RETAINED`; `false` if there is no conflict with the peer.
+- `adoptChain` switches to the peer's chain regardless of its length: validates it, returns transfers of the
+  discarded own blocks to the pending pool, logs, emits `CHAIN_ADOPTED` and broadcasts the new latest block on
+  the next tick. `false` if there is no conflict or the peer's chain is invalid.
 
-**Parameters:**
-- `chainLength` (number) - Block index
+Incoming blocks follow the longest-chain rule automatically, see [ARCHITECTURE.md](ARCHITECTURE.md#fork-handling-and-chain-conflicts).
 
-**Returns:**
-- `Block` - The block at the index
-- `null` - If index out of bounds
-
-##### orderTransaction()
-
-```typescript
-orderTransaction(
-  fromAddress: string,
-  toAddress: string,
-  amount: number,
-  signingKey: any
-): void
-```
-
-Orders a new transaction to be broadcast to the network.
-
-**Parameters:**
-- `fromAddress` (string) - Sender's address
-- `toAddress` (string) - Recipient's address
-- `amount` (number) - Amount to transfer
-- `signingKey` (any) - Signing key for transaction (must match fromAddress)
-
-**Process:**
-1. Creates transaction
-2. Signs with provided key
-3. Broadcasts to all connected peers
-
-##### getAddress()
+### ChainConflict Interface
 
 ```typescript
-getAddress(): string
-```
-
-Gets this node's address (public key).
-
-**Returns:**
-- `string` - Base58 encoded address
-
----
-
-### Tick Interface
-
-Event emitted by System on each simulation cycle.
-
-```typescript
-export interface Tick {
-  increment: number;     // Cycle counter (1, 2, 3, ...)
-  elapsedTime: number;   // Cumulative time in milliseconds
+export interface ChainConflict {
+  peerId: string;      // connected peer
+  forkIndex: number;   // first differing block (0 = genesis)
+  ownLength: number;   // blocks in the own chain
+  peerLength: number;  // blocks in the peer's chain
+  retained: boolean;   // the node decided to keep its chain for the current state of both chains
 }
 ```
-
-**Properties:**
-- `increment` - Sequential cycle number
-- `elapsedTime` - Total elapsed time since system.start()
 
 ---
 
@@ -798,212 +408,173 @@ export interface Tick {
 
 ### SmlCommon Class
 
-Cryptographic and utility functions.
+`src/common.ts` – static helpers.
+
+| Member | Description |
+| --- | --- |
+| `curve` | secp256k1 `elliptic` curve |
+| `generateKeyPair(privateKey?)` | New key pair, or imported from a Base58 private key |
+| `HexToBase58(hex)` / `Base58ToHex(base58)` | Encoding conversion |
+| `BufferFromHex(hex): Uint8Array` | Throws for non-strings and odd lengths |
+| `Uint8ArrayToHex(bytes)` | Lowercase hex without prefix |
+| `generateTimestamp(): string` | Current time in ms |
+| `generateNonce(): string` | 4 random alphanumeric characters |
+| `RandomSeed(min, max, seed)` | Deterministic integer in `[min, max]` for a numeric seed |
 
 ```typescript
-export default class SmlCommon {
-  static curve: EC;  // secp256k1 elliptic curve
-}
-```
-
-#### Static Methods
-
-##### generateKeyPair()
-
-```typescript
-static generateKeyPair(privateKey?: string): KeyPair
-```
-
-Generates or imports an ECDSA secp256k1 key pair.
-
-**Parameters:**
-- `privateKey` (string, optional) - Base58 encoded private key to import
-
-**Returns:**
-- `KeyPair` - Elliptic library key pair object
-
-**Example:**
-```typescript
-// Generate new key pair
-const keyPair1 = SmlCommon.generateKeyPair();
-
-// Import from private key
-const keyPair2 = SmlCommon.generateKeyPair('QmPrivateKeyBase58');
-```
-
-##### HexToBase58()
-
-```typescript
-static HexToBase58(hexString: string): string
-```
-
-Converts a hex string to Base58 encoding.
-
-**Parameters:**
-- `hexString` (string) - Hex encoded string
-
-**Returns:**
-- `string` - Base58 encoded result
-
-**Example:**
-```typescript
-const base58 = SmlCommon.HexToBase58('48656c6c6f');  // "9Ajdvzr"
-```
-
-##### Base58ToHex()
-
-```typescript
-static Base58ToHex(base58String: string): string
-```
-
-Converts a Base58 string to hex encoding.
-
-**Parameters:**
-- `base58String` (string) - Base58 encoded string
-
-**Returns:**
-- `string` - Hex encoded result
-
-##### Uint8ArrayToHex()
-
-```typescript
-static Uint8ArrayToHex(bytes: Uint8Array): string
-```
-
-Converts a Uint8Array to hex string.
-
-**Parameters:**
-- `bytes` (Uint8Array) - Byte array
-
-**Returns:**
-- `string` - Hex encoded string
-
-##### generateTimestamp()
-
-```typescript
-static generateTimestamp(): string
-```
-
-Gets the current timestamp.
-
-**Returns:**
-- `string` - Current timestamp in milliseconds
-
-##### generateNonce()
-
-```typescript
-static generateNonce(): string
-```
-
-Generates a unique nonce for transactions.
-
-**Returns:**
-- `string` - Unique nonce value
-
-##### RandomSeed()
-
-```typescript
-static RandomSeed(
-  min: number,
-  max: number,
-  seed: number
-): number
-```
-
-Generates a seeded random number.
-
-**Parameters:**
-- `min` (number) - Minimum value (inclusive)
-- `max` (number) - Maximum value (inclusive)
-- `seed` (number) - Seed for reproducibility
-
-**Returns:**
-- `number` - Random integer between min and max
-
-**Example:**
-```typescript
-const r1 = SmlCommon.RandomSeed(1, 100, 12345);  // Deterministic
-const r2 = SmlCommon.RandomSeed(1, 100, 12345);  // Same as r1
+const keyPair = SmlCommon.generateKeyPair();
+const address = SmlCommon.HexToBase58(keyPair.getPublic(true, 'hex'));
 ```
 
 ---
 
-## Graph/Visualization Module
+## Application Module
 
-The graph is rendered with Vue Flow. The frontend state lives in composables under `app/composables/`.
+### Network Store
 
-### Network Store (`app/composables/useNetwork.ts`)
+`app/composables/useNetwork.ts` – single source of truth for the UI.
 
 ```typescript
 const network = createNetworkStore(options?: {
-  system?: System;
-  animations?: BroadcastAnimations;
-  flashDuration?: number; // default 2000 ms
+  system?: System;                  // custom clock (tests)
+  animations?: BroadcastAnimations; // custom animation store (tests)
+  flashDuration?: number;           // warning flash, default 2000 ms
 });
-provideNetwork(network); // in a parent component
-const network = useNetwork(); // in descendants
+provideNetwork(network);            // in a parent component (app.vue)
+const network = useNetwork();       // in descendants
 ```
 
 **State**
-- `nodes: ShallowRef<SystemNode[]>`, `nodeIds: ComputedRef<string[]>`
-- `edges: ComputedRef<{ id, source, target }[]>` – derived from the peer connections
-- `selectedNodeId: Ref<string | null>`, `flashing: Ref<string[]>`, `running: Ref<boolean>`
-- `version: Ref<number>` – bumped whenever domain state may have changed
+
+| Member | Type | Description |
+| --- | --- | --- |
+| `system` | `System` | Simulation clock |
+| `animations` | `BroadcastAnimations` | Packets on the edges |
+| `nodes` / `nodeIds` | `ShallowRef<SystemNode[]>` / `ComputedRef<string[]>` | Nodes in creation order |
+| `edges` | `ComputedRef<NetworkEdge[]>` | `{ id: 'A--B', source, target }`, derived from the peer connections |
+| `conflictEdgeIds` | `ComputedRef<Set<string>>` | Edges whose nodes have diverging chains and at least one has not decided |
+| `selectedNodeId` | `Ref<string \| null>` | Selection shared by graph, explorer and editor |
+| `flashing` | `Ref<string[]>` | Nodes currently flashing a warning |
+| `running` | `Ref<boolean>` | Whether the clock runs |
+| `version` | `Ref<number>` | Bumped whenever domain state may have changed |
+
+**Queries**
+
+| Method | Returns |
+| --- | --- |
+| `getNode(id)` | `SystemNode \| undefined` |
+| `getNodeView(id)` | `NodeView \| undefined` – `{ id, address, balance, isMining, miningDelay, connectedIds, chainLength, openConflicts }` |
+| `getChainConflicts(id)` | `ChainConflict[]` (empty for unknown nodes) |
+| `isConnected(a, b)` | `boolean` |
+| `nextNodeName()` | Unused name for a new node |
 
 **Actions**
-- `addNode(id)` / `nextNodeName()`
-- `connect(a, b)`, `disconnect(a, b)`, `toggleConnection(a, b)`, `isConnected(a, b)`
-- `select(id | null)`
-- `orderTransaction(issuerId, fromAddress, toAddress, amount, signingKey): boolean`
-- `sendTransaction(issuerId, fromId, toId, amount): boolean`
-- `startMining(id)`, `validateChain(id): boolean`
-- `start()`, `stop()`, `dispose()`
-- `getNode(id)`, `getNodeView(id): { id, address, balance, isMining, miningDelay, connectedIds }`
 
-### Broadcast Animations (`app/composables/useBroadcastAnimations.ts`)
+| Method | Description |
+| --- | --- |
+| `addNode(id)` | Create a node (returns the existing one for a known id) |
+| `connect(a, b)` / `disconnect(a, b)` / `toggleConnection(a, b)` | Peer connections |
+| `select(id \| null)` | Select a node (unknown ids clear the selection) |
+| `orderTransaction(issuerId, fromAddress, toAddress, amount, signingKey): boolean` | Low-level transaction |
+| `sendTransaction(issuerId, fromId, toId, amount): boolean` | Transfer between two node wallets |
+| `startMining(id)` | Mine the node's pending pool (no-op while mining) |
+| `validateChain(id): boolean` | Validate the node's chain |
+| `adoptChain(id, peerId): boolean` | Resolve a conflict by switching `id` to the peer's chain |
+| `retainChain(id, peerId): boolean` | Resolve a conflict by keeping `id`'s chain |
+| `start()` / `stop()` / `dispose()` / `touch()` | Clock, cleanup, manual refresh |
+
+### Broadcast Animations
+
+`app/composables/useBroadcastAnimations.ts`
 
 ```typescript
-const animations = createBroadcastAnimations({ duration?, now?, reducedMotion? });
-animations.launch('tx' | 'block', fromId, toId);
-animations.packetsFor(edgeId);
+const animations = createBroadcastAnimations({ duration?: number, now?: () => number, reducedMotion?: () => boolean });
+animations.launch('tx' | 'block', fromId, toId): Packet;
+animations.packetsFor(edgeId): Packet[];
 animations.purgeEdge(edgeId);
 animations.clear();
+prefersReducedMotion(): boolean;
 ```
 
-### Graph Helpers (`app/utils/graph/`)
+`Packet`: `{ id, kind, edgeId, fromId, toId, startedAt, duration }`; packets expire after `duration`
+(default `PACKET_DURATION`, 2000 ms).
+
+### Scene Setup
+
+`app/config/scenes.ts`, `app/composables/useSceneSetup.ts`
 
 ```typescript
-edgeId(a, b): string // 'A--B', order independent
+interface SceneConfig {
+  name: string;
+  nodes: { id: string; role?: 'genesis' | 'validator' | 'user' }[];
+  connections: { from: string; to: string }[];
+  genesis?: { privateKey: string; recipient: string; amount: number };
+}
+
+const { initializeScene } = useSceneSetup();
+const cancel = initializeScene(defaultScene, network); // genesis transaction after GENESIS_DELAY (1000 ms)
+cancel();                                              // cancel a pending genesis transaction
+```
+
+Presets: `defaultScene`, `simpleScene`, `scenes`.
+
+### Other Composables and Plugins
+
+| API | Description |
+| --- | --- |
+| `useAssetUrl()(path)` | URL of a file in `public/` under the configured base URL |
+| `useAppVersion()` / `$version` | App version from `package.json` (runtime config `public.appVersion`) |
+
+### Helpers
+
+`app/utils/`
+
+```typescript
+// address.ts
+MINING_REWARD_ADDRESS                                  // '_'
+describeAddress(address, nodes, genesisAddress?): { label, kind: 'reward' | 'genesis' | 'node' | 'external' }
+
+// graph/broadcast.ts
+edgeId(a, b): string                                   // 'A--B', order independent
 resolveBroadcastTargets(senderId, referrerId, neighborIds): string[]
+
+// graph/spring-layout.ts
 computeSpringLayout(ids, edges, { iterations?, scale?, padding?, rng? }): Record<string, { x, y }>
+seededRandom(seed): () => number
+
+// graph/motion.ts
+PACKET_DURATION, PACKET_FADE_START
 easeInOutQuad(t), packetOpacity(t), progressAt(now, { startedAt, duration }), pointOnPath(path, t, reverse?)
+
+// graph/floating-edge.ts
 getFloatingEdgeParams(sourceRect, targetRect): { sx, sy, tx, ty, sourceSide, targetSide }
+getRectIntersection(from, to), getSide(rect, point)
+
+// graph/colors.ts
+nodeColor(index): string                               // hsl accent color
 ```
 
 ---
 
 ## Type Definitions
 
-### BlockBroadcast
-
 ```typescript
 interface BlockBroadcast {
   block: Block;
-  sender: SystemNode;
-  rewardTx: Transaction;
-  referrer: SystemNode;
+  sender: SystemNode;     // node that sends this broadcast
+  rewardTx: Transaction;  // reward for the block's miner, to be included in the next block
+  referrer: SystemNode;   // node the block came from (the miner, or the peer a relay received it from)
 }
-```
 
-### TransactionBroadcast
-
-```typescript
 interface TransactionBroadcast {
   tx: Transaction;
   sender: SystemNode;
   referrer: SystemNode;
 }
 ```
+
+`src/blockchain/types.ts` additionally defines `LogLevel`, `LogCallback`, `BlockchainConfig`, `MinedBlockData`
+and `SerializableTransaction` (the transaction shape sent to the mining worker).
 
 ---
 
@@ -1012,56 +583,51 @@ interface TransactionBroadcast {
 ### Creating a Blockchain and Mining
 
 ```typescript
-import { Blockchain } from '~/src/blockchain/blockchain';
-import { Transaction } from '~/src/blockchain/transaction';
-import SmlCommon from '~/src/common';
+import { Blockchain } from '~~/src/blockchain/blockchain';
+import { Transaction } from '~~/src/blockchain/transaction';
+import SmlCommon from '~~/src/common';
 
-// Create blockchain
 const blockchain = new Blockchain();
+const genesisKey = SmlCommon.generateKeyPair(genesisPrivateKey); // key of blockchain.genesisAddress
+const recipient = SmlCommon.HexToBase58(SmlCommon.generateKeyPair().getPublic(true, 'hex'));
 
-// Create and sign transaction
-const keyPair = SmlCommon.generateKeyPair();
-const fromAddress = SmlCommon.HexToBase58(keyPair.getPublic(true, 'hex'));
-const tx = new Transaction(fromAddress, 'QmRecipientAddress', 50.0);
-Transaction.signTransaction(tx, keyPair);
-
-// Add to blockchain
+const tx = new Transaction(blockchain.genesisAddress, recipient, 25);
+tx.signTransaction(genesisKey);
 blockchain.addTransaction(tx);
 
-// Mine a block
-blockchain.minePendingTransactions(fromAddress, (newBlock, rewardTx) => {
-  console.log('Block mined:', newBlock.hash);
-  console.log('Balance:', blockchain.getBalanceOfAddress(fromAddress));
+blockchain.minePendingTransactions(recipient, (block, rewardTx) => {
+  if (block && blockchain.addBlock(block)) {
+    blockchain.restorePendingTransactions([rewardTx!, ...blockchain.pendingTransactions]);
+    console.log(blockchain.getBalanceOfAddress(recipient)); // 25
+  }
 });
 ```
 
 ### Creating a Multi-Node Network
 
 ```typescript
-import { System } from '~/src/network/system';
-import { SystemNode } from '~/src/network/system_node';
+import { System } from '~~/src/network/system';
+import { SystemNode } from '~~/src/network/system_node';
 
-// Create system
 const system = new System();
 system.start();
 
-// Create nodes
 const alice = new SystemNode('Alice', system);
 const bob = new SystemNode('Bob', system);
-
-// Connect nodes
 alice.connectToNode(bob);
 
-// Alice sends transaction
-alice.orderTransaction(
-  alice.address,
-  bob.address,
-  50.0,
-  alice.keyPair
-);
+alice.orderTransaction(alice.blockchain.genesisAddress, bob.address, 30, genesisKey);
+alice.startMining(() => console.log('mined', alice.blockchain.getBlockchainLength()));
+```
 
-// Stop simulation
-setTimeout(() => system.stop(), 10000);
+### Resolving a Chain Conflict
+
+```typescript
+const [conflict] = alice.getChainConflicts();
+// { peerId: 'Bob', forkIndex: 1, ownLength: 2, peerLength: 2, retained: false }
+
+alice.retainChain('Bob');   // keep Alice's chain until one of the chains changes
+bob.adoptChain('Alice');    // or: Bob switches to Alice's chain
 ```
 
 ### Driving the Network Store
@@ -1076,44 +642,47 @@ network.addNode('Bob');
 network.connect('Alice', 'Bob');
 network.select('Alice');
 network.startMining('Alice');
+
+network.getChainConflicts('Alice').forEach(({ peerId }) => network.retainChain('Alice', peerId));
 ```
+
+---
+
+## Console Messages
+
+Chain related messages of `SystemNode` (shown in the console pane):
+
+| Level | Message |
+| --- | --- |
+| log | `⛓: Synchronized N missing blocks from Peer: a → b blocks` |
+| log | `⛓: Adopted Peer's longer chain (longest-chain rule): a → b blocks, fork at block #i, n own blocks discarded[, k transactions returned to the pending pool]` |
+| log | `⛓: Adopted Peer's chain: …` (user decision) |
+| log | `⛓: Retained own chain (a blocks), ignoring Peer's conflicting chain (b blocks, fork at block #i)` |
+| warn | `⛓: Chain conflict with Peer: chains fork at block #i (both a blocks \| own a blocks, Peer's b blocks). Keeping own chain, retain it or adopt Peer's chain in the explorer` |
+| warn | `⛓: Rejected Peer's longer chain, it failed validation` |
+| warn | `⛏: Mined block #i rejected, the chain changed while mining` |
+
+Block (`🔗`), transaction (`⇄`) and block content (`📦`) messages come from `Blockchain`, `Transaction` and
+`Block` validation.
 
 ---
 
 ## Error Handling
 
-Common error scenarios:
-
-1. **Invalid Transaction Signature**
-   - Check that transaction is signed with correct private key
-   - Ensure fromAddress matches signing key's public key
-
-2. **Insufficient Balance**
-   - Verify sender has enough coins for transaction amount
-   - Account for pending transactions that reduce available balance
-
-3. **Chain Validation Failure**
-   - Block hash doesn't match computed hash
-   - Previous hash doesn't link to last block
-   - Transaction signatures are invalid
-
-4. **Mining Timeout**
-   - Increase difficulty gradually for testing
-   - Higher difficulty = longer mining time
-
----
-
-## Performance Tips
-
-1. **Batch Transactions** - Add multiple transactions before mining
-2. **Cache Balances** - Store frequently queried balances
-3. **Use Indexed Lookup** - For large block lists
-4. **Optimize Mining** - Adjust difficulty based on target block time
-5. **Lazy Load** - Load transaction details on demand
+1. **Transaction rejected** – invalid signature, sender equals recipient, duplicate, or the balance (minus pending
+   spends) does not cover the amount. `orderTransaction` / `sendTransaction` return `false`, a warning is logged
+   and the node flashes.
+2. **Block rejected** – already known, wrong position, wrong previous hash, invalid transactions or missing proof
+   of work. A longer chain behind it is adopted; otherwise a fork is reported as a chain conflict.
+3. **Chain validation failure** – `isChainValid` logs the first failing block.
+4. **Mining failure** – no regular transaction pending, invalid pending pool, worker error or the 5 minute
+   timeout: the callback receives `null`. A block mined on an outdated chain is rejected.
+5. **Signing for another wallet** – `Transaction.signTransaction` throws.
 
 ---
 
 ## Related Documentation
 
-- [README.md](README.md) - Project overview
-- [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture and design
+- [README.md](README.md) – project overview and user guide
+- [ARCHITECTURE.md](ARCHITECTURE.md) – system architecture and design
+- [CHANGELOG.md](CHANGELOG.md) – release notes
