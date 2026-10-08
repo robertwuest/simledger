@@ -20,8 +20,9 @@ test.describe('network graph', () => {
     await node(app, 'Alice').click();
     await expect(node(app, 'Alice')).toHaveClass(/sml-node--selected/);
     await expect(app.getByTestId('explorer-select')).toContainText('Alice');
+    await expect(app.getByTestId('explorer-summary')).toContainText('Alice');
     await expect(app.getByTestId('explorer-ledger')).toContainText('Genesis');
-    await expect(app.getByText('via Alice')).toBeVisible();
+    await expect(app.getByTestId('editor-issuer')).toHaveText('via Alice');
   });
 
   test('selecting a node in the explorer highlights it in the graph', async ({ app }) => {

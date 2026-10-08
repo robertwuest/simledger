@@ -19,7 +19,6 @@
             <GraphViewer />
           </Pane>
           <Pane class="sml-dashboard__container">
-            <PaneHeader title="Explorer" />
             <NodeExplorer />
           </Pane>
         </Splitpanes>
@@ -30,7 +29,6 @@
             <LogConsole />
           </Pane>
           <Pane class="sml-dashboard__container">
-            <PaneHeader title="Editor" />
             <NodeEditor />
           </Pane>
         </Splitpanes>

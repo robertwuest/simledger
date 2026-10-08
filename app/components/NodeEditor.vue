@@ -1,77 +1,230 @@
 <!--
   NodeEditor Component
 
-  Transaction builder and mining controls for the currently selected network node.
-  Allows users to:
-  - Create and broadcast transactions between nodes with specified amounts
-  - Mine pending transactions into a new block
-  - Validate the entire blockchain ledger
+  Actions issued through the selected network node:
+  - New transaction: sign a transfer between two wallets and broadcast it via the selected node
+  - Mining & validation: mine the pending transactions into a block and validate the chain
 
-  Event Flow: User creates tx → sendTransaction() → broadcasts to peer nodes → animations
+  Event Flow: User sends tx → sendTransaction() → broadcasts to peer nodes → animations
   Mining Flow: User clicks Mine → startMining() → PoW computation → block broadcast
 -->
 <template>
-  <div class="sml-node-editor">
-    <p v-if="!selectedId" class="sml-node-editor__empty">Select a node to issue transactions or mine blocks.</p>
-    <template v-else>
-      <section class="sml-node-editor__control">
-        <h4 class="font-bold text-lg">Add Transaction <span class="sml-node-editor__via">via {{ selectedId }}</span></h4>
-        <form class="sml-node-editor__tx" data-testid="editor-tx-form" @submit.prevent="orderTransaction">
-          <div class="tx__connect">
-            <UFormField label="From">
-              <USelect v-model="fromId" :items="nodeItems" class="w-40" placeholder="Select node" icon="i-lucide-arrow-right-from-line" data-testid="editor-from" />
+  <div class="flex min-h-0 flex-1 flex-col">
+    <PaneHeader title="Editor">
+      <template #actions>
+        <UBadge v-if="selectedId" color="neutral" variant="subtle" size="sm" class="gap-1.5" data-testid="editor-issuer">
+          <NodeDot :node-id="selectedId" />via {{ selectedId }}
+        </UBadge>
+      </template>
+    </PaneHeader>
+
+    <UEmpty
+      v-if="!selectedId"
+      icon="i-lucide-square-pen"
+      title="No node selected"
+      description="Select a node to issue transactions or mine blocks."
+      variant="naked"
+      size="sm"
+      class="flex-1"
+    />
+
+    <div v-else class="@container min-h-0 flex-1 overflow-y-auto p-3">
+      <div class="grid gap-3 @xl:grid-cols-2">
+        <UCard variant="subtle" :ui="{ header: 'p-3 sm:px-3', body: 'p-3 sm:p-3' }">
+          <template #header>
+            <div class="flex items-center gap-2">
+              <UIcon name="i-lucide-send" class="size-4 text-primary" />
+              <h3 class="text-sm font-semibold text-highlighted">New transaction</h3>
+            </div>
+            <p class="mt-0.5 text-xs text-muted">Signed with the sender's key and broadcast via {{ selectedId }}.</p>
+          </template>
+
+          <UForm
+            ref="form"
+            :state="state"
+            :validate="validate"
+            :validate-on="['change']"
+            class="space-y-3"
+            data-testid="editor-tx-form"
+            @submit="orderTransaction"
+          >
+            <div class="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-2">
+              <UFormField label="From" name="from">
+                <USelect v-model="state.from" :items="nodeItems" placeholder="Select" class="w-full" data-testid="editor-from">
+                  <template #leading="{ modelValue }">
+                    <NodeDot v-if="modelValue" :node-id="String(modelValue)" />
+                  </template>
+                  <template #item-leading="{ item }">
+                    <NodeDot :node-id="item.value" />
+                  </template>
+                </USelect>
+              </UFormField>
+              <UButton
+                icon="i-lucide-arrow-left-right"
+                color="neutral"
+                variant="ghost"
+                class="mt-6"
+                aria-label="Swap sender and recipient"
+                data-testid="editor-swap"
+                @click="swap"
+              />
+              <UFormField label="To" name="to">
+                <USelect v-model="state.to" :items="nodeItems" placeholder="Select" class="w-full" data-testid="editor-to">
+                  <template #leading="{ modelValue }">
+                    <NodeDot v-if="modelValue" :node-id="String(modelValue)" />
+                  </template>
+                  <template #item-leading="{ item }">
+                    <NodeDot :node-id="item.value" />
+                  </template>
+                </USelect>
+              </UFormField>
+            </div>
+
+            <UFormField label="Amount" name="amount">
+              <UInputNumber v-model="state.amount" :step="10" :min="0" class="w-full" data-testid="editor-amount" />
+              <template #help>
+                <span v-if="exceedsBalance" class="flex items-center gap-1 text-warning" data-testid="editor-balance-warning">
+                  <UIcon name="i-lucide-triangle-alert" class="size-3.5" />
+                  Exceeds {{ state.from }}'s balance of {{ senderBalance }}, the node will reject it.
+                </span>
+                <span v-else-if="state.from" data-testid="editor-balance">Available: {{ senderBalance }}</span>
+              </template>
             </UFormField>
-            <UFormField label="To">
-              <USelect v-model="toId" :items="nodeItems" class="w-40" placeholder="Select node" icon="i-lucide-arrow-right-to-line" data-testid="editor-to" />
-            </UFormField>
+
+            <UButton type="submit" icon="i-lucide-send" block data-testid="editor-add">Send transaction</UButton>
+          </UForm>
+        </UCard>
+
+        <UCard variant="subtle" :ui="{ header: 'p-3 sm:px-3', body: 'p-3 sm:p-3 space-y-3' }">
+          <template #header>
+            <div class="flex items-center gap-2">
+              <UIcon name="i-lucide-pickaxe" class="size-4 text-primary" />
+              <h3 class="text-sm font-semibold text-highlighted">Mining &amp; validation</h3>
+            </div>
+            <p class="mt-0.5 text-xs text-muted" data-testid="editor-pending-count">
+              {{ pendingTransfers }} pending {{ pendingTransfers === 1 ? 'transaction' : 'transactions' }} waiting for a block.
+            </p>
+          </template>
+
+          <div class="space-y-1.5">
+            <UButton
+              icon="i-lucide-pickaxe"
+              block
+              :loading="isMining"
+              :disabled="!canMine"
+              data-testid="editor-mine"
+              @click="minePendingTransactions"
+            >
+              {{ isMining ? 'Mining…' : 'Mine block' }}
+            </UButton>
+            <template v-if="isMining">
+              <UProgress :model-value="null" size="xs" data-testid="editor-mining-progress" />
+              <p class="text-xs text-muted">Proof of work running, lottery roll {{ miningRoll }}.</p>
+            </template>
+            <p v-else-if="!pendingTransfers" class="text-xs text-muted" data-testid="editor-mine-hint">Add a transaction first, blocks need at least one transfer.</p>
           </div>
-          <UFormField label="Amount">
-            <UInputNumber v-model="txAmount" :step="10" :min="0" data-testid="editor-amount" />
-          </UFormField>
-          <UButton type="submit" class="max-h-fit" icon="i-lucide-circle-plus" :disabled="!canSubmit" data-testid="editor-add">Add</UButton>
-        </form>
-      </section>
-      <section class="sml-node-editor__control">
-        <h4 class="font-bold text-lg">Controls</h4>
-        <div class="sml-node-editor__tx">
-          <UButton icon="i-lucide-pickaxe" :loading="isMining" :disabled="isMining" data-testid="editor-mine" @click="minePendingTransactions">
-            {{ isMining ? 'Mining…' : 'Mine New Block' }}
-          </UButton>
-          <UButton icon="i-lucide-ticket-check" variant="outline" data-testid="editor-validate" @click="validateChain">Validate current chain</UButton>
-        </div>
-      </section>
-    </template>
+
+          <USeparator />
+
+          <div class="space-y-2">
+            <UButton icon="i-lucide-shield-check" color="neutral" variant="outline" block data-testid="editor-validate" @click="validateChain">
+              Validate chain
+            </UButton>
+            <UAlert
+              v-if="validation"
+              :color="validation.valid ? 'success' : 'error'"
+              variant="subtle"
+              :icon="validation.valid ? 'i-lucide-shield-check' : 'i-lucide-shield-alert'"
+              :title="validation.valid ? 'Chain valid' : 'Chain invalid'"
+              :description="validation.valid
+                ? `${validation.nodeId}'s blockchain passed validation at ${validation.time}.`
+                : `${validation.nodeId}'s blockchain failed validation at ${validation.time}. See the console for details.`"
+              :ui="{ root: 'p-2.5', title: 'text-sm', description: 'text-xs' }"
+              data-testid="editor-validation"
+            />
+          </div>
+        </UCard>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
+import type { FormError } from '@nuxt/ui';
+import PaneHeader from './PaneHeader.vue';
+import NodeDot from './ledger/NodeDot.vue';
 import { useNetwork } from '~/composables/useNetwork';
+import { MINING_REWARD_ADDRESS } from '~/utils/address';
+
+interface TransactionForm {
+  from?: string;
+  to?: string;
+  amount: number;
+}
 
 const network = useNetwork();
 const toast = useToast();
 
-const fromId = ref<string | undefined>();
-const toId = ref<string | undefined>();
-const txAmount = ref<number>(0);
+const state = reactive<TransactionForm>({ from: undefined, to: undefined, amount: 0 });
+const validation = ref<{ nodeId: string; valid: boolean; time: string } | null>(null);
 
 const selectedId = computed(() => network.selectedNodeId.value);
-const nodeItems = computed(() => network.nodeIds.value.map(id => ({ label: id, value: id })));
-const isMining = computed(() => !!(selectedId.value && network.getNodeView(selectedId.value)?.isMining));
-const canSubmit = computed(() => !!fromId.value && !!toId.value && txAmount.value > 0);
+const nodeItems = computed(() => network.nodeIds.value.map(id => ({
+  label: id,
+  value: id,
+  description: `Balance ${network.getNodeView(id)?.balance ?? 0}`,
+})));
+
+const view = computed(() => (selectedId.value ? network.getNodeView(selectedId.value) : undefined));
+const isMining = computed(() => !!view.value?.isMining);
+const miningRoll = computed(() => (view.value?.miningDelay ?? 0) + 1);
+
+const pendingTransfers = computed(() => {
+  void network.version.value;
+  const node = network.getNode(selectedId.value);
+  return node ? node.blockchain.pendingTransactions.filter(tx => tx.fromAddress !== MINING_REWARD_ADDRESS).length : 0;
+});
+const canMine = computed(() => !isMining.value && pendingTransfers.value > 0);
+
+const senderBalance = computed(() => (state.from ? network.getNodeView(state.from)?.balance ?? 0 : 0));
+const exceedsBalance = computed(() => !!state.from && state.amount > senderBalance.value);
+
+// Default the sender to the issuing node; reset per-node feedback
+watch(selectedId, (id) => {
+  validation.value = null;
+  if (id && !state.from) {
+    state.from = id;
+  }
+}, { immediate: true });
 
 /**
- * Creates and broadcasts a transaction between two nodes
- *
- * The selected node adds the signed transaction to its pending pool and
- * broadcasts it to its peers.
+ * Blocking form validation (balance is only a warning, rejections are part of the simulation)
+ */
+function validate(values: Partial<TransactionForm>): FormError[] {
+  const errors: FormError[] = [];
+  if (!values.from) errors.push({ name: 'from', message: 'Choose a sender' });
+  if (!values.to) errors.push({ name: 'to', message: 'Choose a recipient' });
+  if (values.from && values.to && values.from === values.to) errors.push({ name: 'to', message: 'Must differ from the sender' });
+  if (!values.amount || values.amount <= 0) errors.push({ name: 'amount', message: 'Enter an amount above 0' });
+  return errors;
+}
+
+function swap() {
+  [state.from, state.to] = [state.to, state.from];
+}
+
+/**
+ * Signs and broadcasts the transaction through the selected node
  */
 function orderTransaction() {
-  if (!selectedId.value || !fromId.value || !toId.value) {
+  if (!selectedId.value || !state.from || !state.to) {
     return;
   }
-  if (network.sendTransaction(selectedId.value, fromId.value, toId.value, txAmount.value)) {
-    toast.add({ title: 'Transaction submitted', description: `${txAmount.value} from ${fromId.value} to ${toId.value}`, icon: 'i-lucide-send', color: 'info' });
+  const { from, to, amount } = state;
+  if (network.sendTransaction(selectedId.value, from, to, amount)) {
+    toast.add({ title: 'Transaction submitted', description: `${amount} from ${from} to ${to}`, icon: 'i-lucide-send', color: 'info' });
+    state.amount = 0;
   } else {
     toast.add({ title: 'Transaction rejected', description: `${selectedId.value} did not accept the transaction. See the console for details.`, icon: 'i-lucide-ban', color: 'error' });
   }
@@ -82,60 +235,25 @@ function orderTransaction() {
  * Mining runs in a Web Worker; the new block is broadcast to all peers.
  */
 function minePendingTransactions() {
-  if (selectedId.value) {
+  if (selectedId.value && canMine.value) {
     network.startMining(selectedId.value);
   }
 }
 
 /**
  * Validates the integrity of the selected node's blockchain
- * (hashes, chain links, signatures and balances) and reports the result.
+ * (hashes, chain links, signatures and balances) and shows the result inline.
  */
 function validateChain() {
   if (!selectedId.value) {
     return;
   }
-  const valid = network.validateChain(selectedId.value);
-  toast.add(valid
-    ? { title: 'Chain is valid', description: `${selectedId.value}'s blockchain passed validation.`, icon: 'i-lucide-shield-check', color: 'success' }
-    : { title: 'Chain is invalid', description: `${selectedId.value}'s blockchain failed validation. See the console for details.`, icon: 'i-lucide-shield-alert', color: 'error' });
+  validation.value = {
+    nodeId: selectedId.value,
+    valid: network.validateChain(selectedId.value),
+    time: new Date().toLocaleTimeString([], { hour12: false }),
+  };
 }
 
-defineExpose({ fromId, toId, txAmount, orderTransaction, minePendingTransactions, validateChain });
+defineExpose({ state, validate, swap, orderTransaction, minePendingTransactions, validateChain });
 </script>
-
-<style>
-  .sml-node-editor {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    text-align: left;
-    padding: 5px;
-    overflow-y: auto;
-  }
-  .sml-node-editor h4 {
-    margin: 0;
-  }
-  .sml-node-editor__via {
-    font-size: 0.75rem;
-    font-weight: normal;
-    color: var(--ui-text-muted);
-  }
-  .sml-node-editor__empty {
-    color: var(--ui-text-muted);
-    font-size: 0.875rem;
-  }
-  .sml-node-editor__tx {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    align-items: end;
-    padding: 6px;
-    background: var(--ui-bg-elevated);
-    border-radius: 4px;
-  }
-  .sml-node-editor__tx .tx__connect {
-    display: flex;
-    gap: 8px;
-  }
-</style>

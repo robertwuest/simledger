@@ -45,7 +45,6 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  text-align: center;
   background-color: var(--ui-bg-muted);
 }
 

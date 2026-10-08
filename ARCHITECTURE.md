@@ -225,12 +225,20 @@ The application uses a declarative approach for scene setup:
 - See [Visualization Layer](#visualization-layer)
 
 #### NodeExplorer (`app/components/NodeExplorer.vue`)
-- Node picker synchronised with the graph selection
-- Shows the node's ledger, pending transactions and chain
+- Node picker in the pane header, synchronised with the graph selection
+- Summary of the selected node: wallet address (copyable), balance, chain height, pending count
+- Collapsible sections: blocks (expandable to hash, previous hash, nonce, miner and transactions),
+  pending transactions and the full ledger
 
 #### NodeEditor (`app/components/NodeEditor.vue`)
-- Creates transactions between wallets, issued by the selected node
-- Starts mining and validates the chain (result shown as toast)
+- "New transaction" form (`UForm`) issued through the selected node: sender defaults to the node,
+  swap button, inline validation, and a non-blocking warning when the amount exceeds the balance
+- "Mining & validation": mine button enabled only with pending transfers, mining progress, and the
+  chain validation result shown inline
+
+#### Ledger building blocks (`app/components/ledger/`)
+- `NodeDot` (node color shared with the graph), `AddressLabel` (node / genesis / reward / external
+  address) and `TransactionItem`, used by explorer and editor for a consistent look
 
 #### LogConsole (`app/components/LogConsole.vue`)
 - Live log messages of all nodes (max. 400 entries)
